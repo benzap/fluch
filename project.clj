@@ -4,7 +4,11 @@
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure "1.8.0"]
-                 [org.clojure/clojurescript "1.8.51"]]
+                 [org.clojure/clojurescript "1.8.51"]
+                 [org.clojure/core.async "0.2.374"]
+                 [prismatic/schema "1.1.1"]
+                 [com.rpl/specter "0.10.0"]
+                 [funcool/cats "1.2.1"]]
   :plugins [[lein-cljsbuild "1.1.3"]]
   :hooks [leiningen.cljsbuild]
   :repositories [["clojars" {:sign-releases false}]]
