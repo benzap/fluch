@@ -5,9 +5,8 @@
   "Creates a canvas in the given div element"
   [div :- js/Element]
   (let [canvas (.createElement js/document "canvas")]
-    (.setAttribute canvas "style"
-                   #js {:position "relative"
-                        :width "100%"
-                        :height "100%"})
+    (aset canvas "style" "position" "relative")
+    (aset canvas "style" "width" "100%")
+    (aset canvas "style" "height" "100%")
     (.appendChild div canvas)
     (.getContext canvas "2d")))
