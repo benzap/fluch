@@ -3,39 +3,61 @@
 
 (enable-console-print!)
 
-(defn num-in-byte-range? [x]
+(defn in-byte-range? [x]
   (and (<= x 255) (>= x 0)))
 
+(defn >zero? [x] (> x 0))
+(defn >=zero? [x] (>= x 0))
 
+(def Letter s/Str)
 
-(def ByteRange (s/constrained s/Num num-in-byte-range?))
+(def ByteRange (s/constrained s/Num in-byte-range?))
 
-(def Color {:r ByteRange
-            :g ByteRange
-            :b ByteRange
-            :a ByteRange})
+(def Color [(s/one ByteRange "r")
+            (s/one ByteRange "g")
+            (s/one ByteRange "b")
+            (s/one ByteRange "a")])
+
+;;
+;; Type of Terminal Blocks
+;;
 
 (def TextBlock {:type (s/eq "Text")
                 :foreground-color Color
                 :background-color Color
-                :text s/Str})
+                :style {(s/optional-key :bold) s/Bool
+                        (s/optional-key :underline) s/Bool
+                        (s/optional-key :italic) s/Bool}
+                :text Letter})
 
-(s/validate TextBlock {:type "Text"
-                       :foreground-color {:r 1 :g 1 :b 1 :a 1}
-                       :background-color {:r 1 :g 1 :b 1 :a 1}
-                       :text "a"})
+(def EmptyBlock {:type (s/eq "Empty")
+                 :foreground-color Color
+                 :background-color Color})
+
+
+;; Checking type of Terminal Block
+(defn is-type? [xs x] (= (:type xs) x))
+
+(def TerminalContent
+  "The terminal blocks that make up the terminal"
+  [[(s/conditional
+     #(is-type? % "Text")
+     TextBlock
+     :else
+     EmptyBlock
+     )]])
 
 (def TerminalOptions
   "Schema for Terminal Options"
-  {;; defaults
-   :foreground-color Color
+  {:foreground-color Color
    :background-color Color
    })
 
 (def Terminal
   "Schema for a Terminal"
-  {:context js/Element
+  {:context js/CanvasRenderingContext2D
+   :options TerminalOptions
    :rows (s/pred integer?)
    :cols (s/pred integer?)
-   :size s/Num
-   :content [[TextBlock]]})
+   :size (s/constrained s/Num >zero?)
+   :content TerminalContent})
