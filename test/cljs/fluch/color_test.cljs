@@ -1,5 +1,5 @@
 (ns fluch.color-test
-  (:require-macros [cljs.test :refer (is deftest testing)])
+  (:require-macros [cljs.test :refer (is are deftest testing)])
   (:require [cljs.test]
             [fluch.color :as color]))
 
@@ -24,12 +24,11 @@
   )
 
 (deftest hex->term-test
-  (is (= (color/hex->term "#FFFFFF") [255 255 255 255]))
-  (is (= (color/hex->term "#ffffff") [255 255 255 255]))
-  (is (= (color/hex->term "#FFF") [255 255 255 255]))
-  (is (= (color/hex->term "#fff") [255 255 255 255]))
-
-  (is (= (color/hex->term "#FF00FF") [255 0 255 255]))
-  (is (= (color/hex->term "#F0F") [255 0 255 255]))
-
-  )
+  (are [x y] (= (color/hex->term x) y)
+    "#FFFFFF" [255 255 255 255]
+    "#ffffff" [255 255 255 255]
+    "#FFF" [255 255 255 255]
+    "#fff" [255 255 255 255]
+    "#FF00FF" [255 0 255 255]
+    "#F0F" [255 0 255 255]
+    ))

@@ -56,7 +56,7 @@
     :or {rows default-num-rows
          cols default-num-cols
          size default-cell-size
-         foreground-color default-foreground-color
+         foreground-cdddolor default-foreground-color
          background-color default-background-color}}]
   {:context context
    :options {:foreground-color foreground-color
