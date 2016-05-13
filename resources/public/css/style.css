@@ -1,0 +1,19 @@
+* {
+    padding: 0;
+    margin: 0;
+    box-sizing: border-box;
+}
+
+body {
+    width: 100%;
+    background-color: #1d1d1d;
+    padding: 10px;
+}
+
+#term {
+    width: 800px;
+    height: 600px;
+    margin: auto auto;
+    background-color: #000;
+    border: 1px solid white;
+}

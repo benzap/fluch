@@ -3,8 +3,12 @@
 
 (enable-console-print!)
 
+(defn in-unit-interval? [x]
+  (and (<= x 0.0) (>= 1.0)))
+(def UnitInterval (s/constrained s/Num in-unit-interval?))
+
 (defn in-byte-range? [x]
-  (and (<= x 255) (>= x 0)))
+  (and (<= x 255) (>= x 0) (integer? x)))
 
 (defn >zero? [x] (> x 0))
 (defn >=zero? [x] (>= x 0))

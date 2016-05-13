@@ -33,15 +33,12 @@
                                    :pretty-print false}}
                        :test
                        {:source-paths ["src/cljs" "test/cljs"]
-                        :compiler {:output-dir "resources/public/js/test/out"
-                                   :output-to "resources/public/js/test/test_fluch.js"
-                                   :asset-path "js/test/out"
+                        :compiler {:output-to "resources/public/js/test_fluch.js"
                                    :optimizations :none
-                                   :pretty-print true
-                                   :main fluch.test-runner
-                                   :source-map true}}
+                                   :main fluch.test-runner}}
                        }}
   
   
-  :profiles {:dev {:dependencies [[doo "0.1.7-SNAPSHOT"]]
+  :profiles {:dev {:dependencies [[doo "0.1.7-SNAPSHOT"]
+                                  [binaryage/devtools "0.6.1"]]
                    :plugins [[lein-doo "0.1.6"]]}})

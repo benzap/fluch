@@ -68,3 +68,8 @@
              rows cols
              foreground-color background-color)
    })
+
+(s/defn draw :- schemas/Terminal
+  [terminal :- schemas/Terminal]
+  
+  )
