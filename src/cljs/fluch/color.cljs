@@ -5,8 +5,8 @@
             [fluch.schemas :as schemas]))
 
 (def re-hex #"(?i)#([0-9A-F]{1,2})([0-9A-F]{1,2})([0-9A-F]{1,2})")
-(def re-rgba #"(?i)rgba\(([0-9]+),([0-9]+),([0-9]+),([0-9.]+)\)")
-(def re-rgb #"(?i)rgb\(([0-9]+),([0-9]+),([0-9]+)\)")
+(def re-rgba #"(?i)rgba\(([0-9]+),\s*([0-9]+),\s*([0-9]+),\s*([0-9.]+)\)")
+(def re-rgb #"(?i)rgb\(([0-9]+),\s*([0-9]+),\s*([0-9]+)\)")
 
 (s/defn byte->unit-interval :- schemas/UnitInterval
   [x :- schemas/ByteRange]
@@ -32,10 +32,17 @@
      (js/parseInt (fix-hex b) 16)
      255]))
 
+(s/defn term->hex :- s/Str
+  [c :- schemas/Color]
+  (let [[r g b a] (->> c 
+                       (map #(.toString % 16))
+                       (map fix-hex))]
+    (str "#" r g b)))
+
 (s/defn rgba->term :- schemas/Color
   [s :- s/Str]
   (when-let [[_ r g b a] (re-matches re-rgba s)]
-    [(js/parseInt r 16) (js/parseInt g 16) (js/parseInt b 16)
+    [(js/parseInt r 10) (js/parseInt g 10) (js/parseInt b 10)
      (unit-interval->byte (js/parseFloat a))]))
 
 (s/defn term->rgba :- s/Str
@@ -46,7 +53,13 @@
 (s/defn rgb->term :- schemas/Color
   [s]
   (when-let [[_ r g b] (re-matches re-rgb s)]
-    [(js/parseInt r 16) (js/parseInt g 16) (js/parseInt b 16) 255]))
+    [(js/parseInt r 10) (js/parseInt g 10) (js/parseInt b 10) 255]))
+
+(s/defn term->rgb :- s/Str
+  [c :- schemas/Color]
+  (let [[r g b a] c]
+    (str "rgb(" r "," g "," b ")")
+    ))
 
 (s/defn lighten :- schemas/Color
   [c :- schemas/Color ratio :- schemas/UnitInterval]
