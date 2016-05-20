@@ -4,7 +4,7 @@
 (enable-console-print!)
 
 (defn in-unit-interval? [x]
-  (and (<= x 0.0) (>= 1.0)))
+  (and (>= x 0.0) (<= 1.0)))
 (def UnitInterval (s/constrained s/Num in-unit-interval?))
 
 (defn in-byte-range? [x]
@@ -41,20 +41,24 @@
 
 ;; Checking type of Terminal Block
 (defn is-type? [xs x] (= (:type xs) x))
-
-(def TerminalContent
-  "The terminal blocks that make up the terminal"
-  [[(s/conditional
+(def TerminalBlock
+  (s/conditional
      #(is-type? % "Text")
      TextBlock
      :else
      EmptyBlock
-     )]])
+     ))
+
+(def TerminalContent
+  "The terminal blocks that make up the terminal"
+  [[TerminalBlock]])
 
 (def TerminalOptions
   "Schema for Terminal Options"
   {:foreground-color Color
    :background-color Color
+   :row-spacing s/Num
+   :col-spacing s/Num
    })
 
 (def Terminal

@@ -8,13 +8,11 @@
 
 (devtools/install!)
 (enable-console-print!)
-
 (s/set-fn-validation! true)
 
-(println "Hello World!")
-
 (def canvas (c/init (.getElementById js/document "term")))
-(def term (atom (t/terminal canvas {})))
+(def term (atom (t/terminal canvas {:rows 2 :cols 2 :background-color [128 128 128 255]})))
+(t/refresh @term)
 
 ;;(println "term" @term)
 (.log js/console "term" @term)

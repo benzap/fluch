@@ -22,5 +22,9 @@
    {:keys [color]
     :or {color [255 255 255 255]}}
    :- {:color schemas/Color}]
-  
-  )
+  (let [scolor (color/term->rgba color)]
+    (.beginPath ctx)
+    (.rect ctx x y width height)
+    (aset ctx "fillStyle" scolor)
+    (.fill ctx))
+  ctx)
