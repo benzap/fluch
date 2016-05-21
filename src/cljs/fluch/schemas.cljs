@@ -53,12 +53,17 @@
   "The terminal blocks that make up the terminal"
   [[TerminalBlock]])
 
+(def TerminalFont
+  "Schema for a terminal font"
+  {:family s/Str
+   :ratio [(s/one s/Num "x-ratio")
+           (s/one s/Num "y-ratio")]})
+
 (def TerminalOptions
   "Schema for Terminal Options"
   {:foreground-color Color
    :background-color Color
-   :row-spacing s/Num
-   :col-spacing s/Num
+   :font TerminalFont
    })
 
 (def Terminal

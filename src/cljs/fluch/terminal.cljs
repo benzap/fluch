@@ -4,6 +4,7 @@
             [fluch.schemas :as schemas]
             [fluch.color :as color]
             [fluch.canvas :as canvas]
+            [fluch.font]
             ))
 
 (def default-num-rows 24)
@@ -11,8 +12,8 @@
 (def default-cell-size 12) ;; px
 (def default-foreground-color [255 255 255 255])
 (def default-background-color [0 0 0 255])
-(def default-row-spacing 3) ;; px
-(def default-col-spacing 5) ;; px
+(def default-row-spacing 1) ;; px
+(def default-col-spacing 1) ;; px
 
 
 (s/defn text-block :- schemas/TextBlock
@@ -46,7 +47,7 @@
 
 (s/defn terminal-content :- schemas/TerminalContent
   [rows cols foreground-color background-color]
-  (let [terminal-block (empty-block 
+  (let [terminal-block (text-block "0"
                         {:foreground-color foreground-color
                          :background-color background-color})
         terminal-row (vec (repeat cols terminal-block))]
@@ -55,25 +56,22 @@
 
 (s/defn terminal :- schemas/Terminal
   [context
-   {:keys [rows
-           cols
-           size
-           row-spacing
-           col-spacing
-           foreground-color
-           background-color]
+   {:keys [rows :- s/Num
+           cols :- s/Num
+           size :- s/Num
+           font :- schemas/TerminalFont
+           foreground-color :- schemas/Color
+           background-color :- schemas/Color]
     :or {rows default-num-rows
          cols default-num-cols
          size default-cell-size
-         row-spacing default-row-spacing
-         col-spacing default-col-spacing
+         font fluch.font/monospace
          foreground-color default-foreground-color
          background-color default-background-color}}]
   {:context context
    :options {:foreground-color foreground-color
              :background-color background-color
-             :row-spacing row-spacing
-             :col-spacing col-spacing}
+             :font font}
    :rows rows
    :cols cols
    :size size
@@ -82,13 +80,15 @@
              foreground-color background-color)
    })
 
-(s/defn calc-dimensions 
+(s/defn calculate-block-location
   [{:keys [size options]} :- schemas/Terminal
    row-index :- s/Num
    col-index :- s/Num]
-  (let [{:keys [row-spacing col-spacing]} options
-        width (+ size (* 2 col-spacing))
-        height (+ size (* 2 row-spacing))]
+  (let [{:keys [font]} options
+        {:keys [ratio]} font
+        [x-ratio y-ratio] ratio
+        width (* (/ size 2) x-ratio)
+        height (* size y-ratio)]
     {:x (-> width (* col-index))
      :y (-> height (* row-index))
      :width width
@@ -108,10 +108,8 @@
         {:keys [background-color]}
         options
         {:keys [x y width height]}
-        (calc-dimensions term row-index col-index)
-        ]
-    (canvas/fill-rect context x y width height {:color background-color})
-    (.log js/console "Drawing:" x y width height)
+        (calculate-block-location term row-index col-index)]
+    (canvas/fill-rect context x y width height :color background-color)
     ))
 
 (s/defmethod draw-block "Text"
@@ -119,18 +117,18 @@
    block :- schemas/TextBlock
    row-index :- s/Num
    col-index :- s/Num]
-  (let [{:keys [context options]}
-        term
-        {:keys [background-color]}
-        options
-        {:keys [x y width height]}
-        (calc-dimensions term row-index col-index)
-        ]
-    (canvas/fill-rect context x y width height {:color background-color})
+  (let [{:keys [context options size]} term
+        {:keys [foreground-color background-color text font]} (merge options block)
+        {:keys [x y width height]} (calculate-block-location term row-index col-index)]
+    (canvas/fill-rect context x y width height :color background-color)
+    (canvas/draw-text context text x y
+                      :size size
+                      :family (:family font)
+                      :foreground-color foreground-color)
     ))
 
-(s/defn refresh
-  [{:keys [content] :as term} :- schemas/Terminal]
+(defn refresh
+  [{:keys [content] :as term}]
   (let [num-rows (count content)
         num-cols (count (first content))]
     (loop [i 0 j 0]
