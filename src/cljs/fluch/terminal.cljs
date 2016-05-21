@@ -80,10 +80,11 @@
              foreground-color background-color)
    })
 
-(s/defn calculate-block-location
+(s/defn locate-block
+  "returns the pixel location and dimensions of the block in pixels"
   [{:keys [size options]} :- schemas/Terminal
-   row-index :- s/Num
-   col-index :- s/Num]
+   col-index :- s/Num
+   row-index :- s/Num]
   (let [{:keys [font]} options
         {:keys [ratio]} font
         [x-ratio y-ratio] ratio
@@ -94,6 +95,13 @@
      :width width
      :height height}))
 
+(s/defn get-block :- schemas/TerminalBlock
+  "get the block at the given column-row point"
+  [{:keys [content]} :- schemas/Terminal
+   row-index :- s/Num
+   col-index :- s/Num]
+  (-> content (get row-index) (get col-index)))
+
 (defmulti draw-block
   (fn [term block row-index col-index]
     (:type block)))
@@ -101,46 +109,43 @@
 (s/defmethod draw-block "Empty"
   [term :- schemas/Terminal
    block :- schemas/EmptyBlock
-   row-index :- s/Num
-   col-index :- s/Num]
+   col-index :- s/Num
+   row-index :- s/Num]
   (let [{:keys [context options]}
         term
         {:keys [background-color]}
         options
         {:keys [x y width height]}
-        (calculate-block-location term row-index col-index)]
+        (locate-block term col-index row-index)]
     (canvas/fill-rect context x y width height :color background-color)
     ))
 
 (s/defmethod draw-block "Text"
   [term :- schemas/Terminal
    block :- schemas/TextBlock
-   row-index :- s/Num
-   col-index :- s/Num]
+   col-index :- s/Num
+   row-index :- s/Num]
   (let [{:keys [context options size]} term
         {:keys [foreground-color background-color text font]} (merge options block)
-        {:keys [x y width height]} (calculate-block-location term row-index col-index)]
+        {:keys [x y width height]} (locate-block term col-index row-index)]
     (canvas/fill-rect context x y width height :color background-color)
     (canvas/draw-text context text x y
                       :size size
                       :family (:family font)
-                      :foreground-color foreground-color)
-    ))
+                      :foreground-color foreground-color)))
 
 (defn refresh
-  [{:keys [content] :as term}]
-  (let [num-rows (count content)
-        num-cols (count (first content))]
-    (loop [i 0 j 0]
-      (draw-block term (-> content (get j) (get i)) j i)
-      (cond
-        ;; processed all blocks
-        (and (>= (inc j) num-rows) (>= (inc i) num-cols))
-        term
-        ;; at the end of the row
-        (>= (inc i) num-cols)
-        (recur 0 (inc j))
-        ;; process the next column in the row
-        :else
-        (recur (inc i) j)
-        ))))
+  [{:keys [rows cols] :as term}]
+  (loop [i 0 j 0]
+    (draw-block term (get-block term i j) i j)
+    (cond
+      ;; processed all blocks
+      (and (>= (inc j) rows) (>= (inc i) cols))
+      term
+      ;; at the end of the row
+      (>= (inc i) cols)
+      (recur 0 (inc j))
+      ;; process the next column in the row
+      :else
+      (recur (inc i) j)
+      )))
