@@ -13,6 +13,7 @@
 (def default-foreground-color [255 255 255 255])
 (def default-background-color [0 0 0 255])
 
+
 (s/defn text-block :- schemas/TextBlock
   [text
    {:keys [foreground-color
@@ -48,8 +49,7 @@
                         {:foreground-color foreground-color
                          :background-color background-color})
         terminal-row (vec (repeat cols terminal-block))]
-    (vec (repeat rows terminal-row))
-    ))
+    (vec (repeat rows terminal-row))))
 
 (s/defn terminal :- schemas/Terminal
   [context
@@ -70,6 +70,7 @@
   {:context context
    :options {:foreground-color foreground-color
              :background-color background-color
+             :offset offset
              :font font}
    :rows rows
    :cols cols
@@ -113,6 +114,15 @@
                            (fn [_] block) content)]
     (assoc term :content new-content)))
 
+(s/defn clear-block :- schemas/Terminal
+  [{:keys [options] :as term} :- schemas/Terminal
+   col-index :- s/Num
+   row-index :- s/Num]
+  (let [{:keys [foreground-color background-color]} options
+        empty (empty-block {:foreground-color foreground-color
+                            :background-color background-color})]
+    (put-block term empty col-index row-index)))
+
 (defmulti draw-block!
   (fn [term block row-index col-index]
     (:type block)))
@@ -128,8 +138,7 @@
         options
         {:keys [x y width height]}
         (locate-block term col-index row-index)]
-    (canvas/fill-rect context x y width height :color background-color)
-    ))
+    (canvas/fill-rect context x y width height :color background-color)))
 
 (s/defmethod draw-block! "Text"
   [term :- schemas/Terminal
@@ -158,8 +167,7 @@
       (recur 0 (inc j))
       ;; process the next column in the row
       :else
-      (recur (inc i) j)
-      )))
+      (recur (inc i) j))))
 
 (s/defn sub-term :- schemas/Terminal
   "Get a sub terminal, representing a section of the current
@@ -183,15 +191,61 @@
    col-offset :- s/Num
    row-offset :- s/Num])
 
-(defn swap-block-left [term col row])
-(defn swap-block-right [term col row])
-(defn swap-block-up [term col row])
-(defn swap-block-down [term col row])
+(defn swap-blocks [term col1 row1 col2 row2]
+  (let [first-block (get-block term col1 row1)
+        second-block (get-block term col2 row2)]
+    (-> term
+        (put-block first-block col2 row2)
+        (put-block second-block col1 row1))))
 
-(defn swap-col-left [term x])
-(defn swap-col-right [term x])
-(defn swap-row-up [term y])
-(defn swap-row-down [term y])
+(defn swap-block-left
+  [term col row]
+  (if (<= col 0)
+    (clear-block term col row)
+    (swap-blocks term col row (dec col) row)))
+
+(defn swap-block-right
+  [{:keys [cols] :as term} col row]
+  (if (>= col cols)
+    (clear-block term col row)
+    (swap-blocks term col row (inc col) row)))
+
+(defn swap-block-up
+  [term col row]
+  (if (<= row 0)
+    (clear-block term col row)
+    (swap-blocks term col row col (dec row))))
+
+
+(defn swap-block-down
+  [{:keys [rows] :as term} col row]
+  (if (>= row rows)
+    (clear-block term col row)
+    (swap-blocks term col row col (inc row))))
+
+(defn swap-col-left
+  [{:keys [rows] :as term} col]
+  (if (<= col 0)
+    (reduce #(clear-block %1 %2 col) term (range rows))
+    (reduce #(swap-blocks %1 col %2 (dec col) %2) term (range rows))))
+
+(defn swap-col-right
+  [{:keys [rows cols] :as term} col]
+  (if (>= col cols)
+    (reduce #(clear-block %1 %2 col) term (range rows))
+    (reduce #(swap-blocks %1 col %2 (inc col) %2) term (range rows))))
+
+(defn swap-row-up
+  [{:keys [rows cols] :as term} row]
+  (if (<= row 0)
+    (reduce #(clear-block %1 row %2) term (range cols))
+    (reduce #(swap-blocks %1 %2 row %2 (dec row)) term (range cols))))
+
+(defn swap-row-down
+  [{:keys [rows cols] :as term} row]
+  (if (>= row rows)
+    (reduce #(clear-block %1 row %2) term (range cols))
+    (reduce #(swap-blocks %1 %2 row %2 (inc row)) term (range cols))))
 
 (defn resize
   "Resize a Terminal to fill the new resized extents"
