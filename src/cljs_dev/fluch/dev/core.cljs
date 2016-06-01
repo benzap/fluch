@@ -19,6 +19,7 @@
                                     :font fluch.font/monospace
                                     :foreground-color [255 255 255 255]
                                     :background-color [255 128 128 255]})))
-(t/refresh @term)
+(reset! term (t/put-block @term (t/text-block "a" {}) 1 1))
+(t/refresh! @term)
 
 (.log js/console "term" @term)

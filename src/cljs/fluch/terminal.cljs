@@ -9,12 +9,9 @@
 
 (def default-num-rows 24)
 (def default-num-cols 80)
-(def default-cell-size 12) ;; px
+(def default-cell-size 12)
 (def default-foreground-color [255 255 255 255])
 (def default-background-color [0 0 0 255])
-(def default-row-spacing 1) ;; px
-(def default-col-spacing 1) ;; px
-
 
 (s/defn text-block :- schemas/TextBlock
   [text
@@ -45,7 +42,7 @@
    :foreground-color foreground-color
    :background-color background-color})
 
-(s/defn terminal-content :- schemas/TerminalContent
+(defn terminal-content
   [rows cols foreground-color background-color]
   (let [terminal-block (text-block "0"
                         {:foreground-color foreground-color
@@ -60,12 +57,14 @@
            cols :- s/Num
            size :- s/Num
            font :- schemas/TerminalFont
+           offset :- schemas/TerminalOffset
            foreground-color :- schemas/Color
            background-color :- schemas/Color]
     :or {rows default-num-rows
          cols default-num-cols
          size default-cell-size
          font fluch.font/monospace
+         offset [0 0]
          foreground-color default-foreground-color
          background-color default-background-color}}]
   {:context context
@@ -85,28 +84,40 @@
   [{:keys [size options]} :- schemas/Terminal
    col-index :- s/Num
    row-index :- s/Num]
-  (let [{:keys [font]} options
+  (let [{:keys [font offset]} options
         {:keys [ratio]} font
+        [col-offset row-offset] offset
         [x-ratio y-ratio] ratio
         width (* (/ size 2) x-ratio)
         height (* size y-ratio)]
-    {:x (-> width (* col-index))
-     :y (-> height (* row-index))
+    {:x (-> width (* (+ col-index col-offset)))
+     :y (-> height (* (+ row-index row-offset)))
      :width width
      :height height}))
 
 (s/defn get-block :- schemas/TerminalBlock
   "get the block at the given column-row point"
   [{:keys [content]} :- schemas/Terminal
-   row-index :- s/Num
-   col-index :- s/Num]
+   col-index :- s/Num
+   row-index :- s/Num]
   (-> content (get row-index) (get col-index)))
 
-(defmulti draw-block
+(s/defn put-block :- schemas/Terminal
+  [{:keys [content] :as term} :- schemas/Terminal
+   block :- schemas/TerminalBlock
+   col-index :- s/Num
+   row-index :- s/Num]
+  (let [new-content
+        (specter/transform [(specter/keypath row-index)
+                            (specter/keypath col-index)]
+                           (fn [_] block) content)]
+    (assoc term :content new-content)))
+
+(defmulti draw-block!
   (fn [term block row-index col-index]
     (:type block)))
 
-(s/defmethod draw-block "Empty"
+(s/defmethod draw-block! "Empty"
   [term :- schemas/Terminal
    block :- schemas/EmptyBlock
    col-index :- s/Num
@@ -120,7 +131,7 @@
     (canvas/fill-rect context x y width height :color background-color)
     ))
 
-(s/defmethod draw-block "Text"
+(s/defmethod draw-block! "Text"
   [term :- schemas/Terminal
    block :- schemas/TextBlock
    col-index :- s/Num
@@ -134,10 +145,10 @@
                       :family (:family font)
                       :foreground-color foreground-color)))
 
-(defn refresh
+(defn refresh!
   [{:keys [rows cols] :as term}]
   (loop [i 0 j 0]
-    (draw-block term (get-block term i j) i j)
+    (draw-block! term (get-block term i j) i j)
     (cond
       ;; processed all blocks
       (and (>= (inc j) rows) (>= (inc i) cols))
@@ -149,3 +160,39 @@
       :else
       (recur (inc i) j)
       )))
+
+(s/defn sub-term :- schemas/Terminal
+  "Get a sub terminal, representing a section of the current
+  terminal.
+
+  A sub-terminal has the same characteristics as a normal
+  Terminal. col-offset and row-offset are the offset from the top-left
+  corner of the terminal. cols and rows are the size extents of the
+  sub terminal, which should be smaller than or equal to the area you
+  are attempting to make a sub-terminal from"
+  [term :- schemas/Terminal
+   col-offset :- s/Num
+   row-offset :- s/Num
+   cols :- s/Num
+   rows :- s/Num])
+
+(s/defn put-term :- schemas/Terminal
+  "Fill a section of a terminal with a sub-terminal"
+  [term :- schemas/Terminal
+   sub-term :- schemas/Terminal
+   col-offset :- s/Num
+   row-offset :- s/Num])
+
+(defn swap-block-left [term col row])
+(defn swap-block-right [term col row])
+(defn swap-block-up [term col row])
+(defn swap-block-down [term col row])
+
+(defn swap-col-left [term x])
+(defn swap-col-right [term x])
+(defn swap-row-up [term y])
+(defn swap-row-down [term y])
+
+(defn resize
+  "Resize a Terminal to fill the new resized extents"
+  [term & {:keys [rows cols size]}])

@@ -59,11 +59,16 @@
    :ratio [(s/one s/Num "x-ratio")
            (s/one s/Num "y-ratio")]})
 
+(def TerminalOffset
+  [(s/one s/Num "col-offset")
+   (s/one s/Num "row-offset")])
+
 (def TerminalOptions
   "Schema for Terminal Options"
   {:foreground-color Color
    :background-color Color
    :font TerminalFont
+   :offset TerminalOffset
    })
 
 (def Terminal
