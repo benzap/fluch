@@ -1,6 +1,5 @@
 (ns fluch.canvas
-  (:require [schema.core :as s :include-macros true]
-            [fluch.schemas :as schemas]
+  (:require [fluch.schemas :as schemas]
             [fluch.color :as color]))
 
 (def default-width 800)

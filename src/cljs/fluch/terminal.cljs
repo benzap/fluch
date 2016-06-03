@@ -1,6 +1,6 @@
 (ns fluch.terminal
-  (:require [schema.core :as s :include-macros true]
-            [com.rpl.specter :as specter]
+  (:require [com.rpl.specter :as specter]
+
             [fluch.schemas :as schemas]
             [fluch.color :as color]
             [fluch.canvas :as canvas]
@@ -14,7 +14,7 @@
 (def default-background-color [0 0 0 255])
 
 
-(s/defn text-block :- schemas/TextBlock
+(defn text-block
   [text
    {:keys [foreground-color
            background-color
@@ -34,7 +34,7 @@
            :italic italic}
    :text text})
 
-(s/defn empty-block :- schemas/EmptyBlock
+(defn empty-block
   [{:keys [foreground-color
            background-color]
     :or {foreground-color default-foreground-color
@@ -51,15 +51,11 @@
         terminal-row (vec (repeat cols terminal-block))]
     (vec (repeat rows terminal-row))))
 
-(s/defn terminal :- schemas/Terminal
+(defn terminal
   [context
-   {:keys [rows :- s/Num
-           cols :- s/Num
-           size :- s/Num
-           font :- schemas/TerminalFont
-           offset :- schemas/TerminalOffset
-           foreground-color :- schemas/Color
-           background-color :- schemas/Color]
+   {:keys [rows cols size font offset
+           foreground-color
+           background-color]
     :or {rows default-num-rows
          cols default-num-cols
          size default-cell-size
@@ -77,14 +73,11 @@
    :size size
    :content (terminal-content
              rows cols
-             foreground-color background-color)
-   })
+             foreground-color background-color)})
 
-(s/defn locate-block
+(defn locate-block
   "returns the pixel location and dimensions of the block in pixels"
-  [{:keys [size options]} :- schemas/Terminal
-   col-index :- s/Num
-   row-index :- s/Num]
+  [{:keys [size options]} col-index row-index]
   (let [{:keys [font offset]} options
         {:keys [ratio]} font
         [col-offset row-offset] offset
@@ -96,28 +89,24 @@
      :width width
      :height height}))
 
-(s/defn get-block :- schemas/TerminalBlock
+(defn get-block
   "get the block at the given column-row point"
-  [{:keys [content]} :- schemas/Terminal
-   col-index :- s/Num
-   row-index :- s/Num]
+  [{:keys [content]}
+   col-index row-index]
   (-> content (get row-index) (get col-index)))
 
-(s/defn put-block :- schemas/Terminal
-  [{:keys [content] :as term} :- schemas/Terminal
-   block :- schemas/TerminalBlock
-   col-index :- s/Num
-   row-index :- s/Num]
+(defn put-block
+  [{:keys [content] :as term}
+   block col-index row-index]
   (let [new-content
         (specter/transform [(specter/keypath row-index)
                             (specter/keypath col-index)]
                            (fn [_] block) content)]
     (assoc term :content new-content)))
 
-(s/defn clear-block :- schemas/Terminal
-  [{:keys [options] :as term} :- schemas/Terminal
-   col-index :- s/Num
-   row-index :- s/Num]
+(defn clear-block
+  [{:keys [options] :as term}
+   col-index row-index]
   (let [{:keys [foreground-color background-color]} options
         empty (empty-block {:foreground-color foreground-color
                             :background-color background-color})]
@@ -127,11 +116,8 @@
   (fn [term block row-index col-index]
     (:type block)))
 
-(s/defmethod draw-block! "Empty"
-  [term :- schemas/Terminal
-   block :- schemas/EmptyBlock
-   col-index :- s/Num
-   row-index :- s/Num]
+(defmethod draw-block! "Empty"
+  [term block col-index row-index]
   (let [{:keys [context options]}
         term
         {:keys [background-color]}
@@ -140,11 +126,9 @@
         (locate-block term col-index row-index)]
     (canvas/fill-rect context x y width height :color background-color)))
 
-(s/defmethod draw-block! "Text"
-  [term :- schemas/Terminal
-   block :- schemas/TextBlock
-   col-index :- s/Num
-   row-index :- s/Num]
+(defmethod draw-block! "Text"
+  [term block
+   col-index row-index]
   (let [{:keys [context options size]} term
         {:keys [foreground-color background-color text font]} (merge options block)
         {:keys [x y width height]} (locate-block term col-index row-index)]
@@ -169,7 +153,7 @@
       :else
       (recur (inc i) j))))
 
-(s/defn sub-term :- schemas/Terminal
+(defn sub-term
   "Get a sub terminal, representing a section of the current
   terminal.
 
@@ -178,18 +162,23 @@
   corner of the terminal. cols and rows are the size extents of the
   sub terminal, which should be smaller than or equal to the area you
   are attempting to make a sub-terminal from"
-  [term :- schemas/Terminal
-   col-offset :- s/Num
-   row-offset :- s/Num
-   cols :- s/Num
-   rows :- s/Num])
+  [{:keys [content] :as term}
+   col-offset row-offset
+   cols rows]
+  (let [new-content 
+        (->> content
+             (specter/select [specter/ALL (specter/srange col-offset (+ cols col-offset))])
+             (specter/select [(specter/srange row-offset (+ rows row-offset)) specter/ALL]))]
+    (-> term 
+        (assoc :content new-content)
+        (assoc :cols cols)
+        (assoc :rows rows)
+        (assoc-in [:options :offset] [col-offset row-offset]))))
 
-(s/defn put-term :- schemas/Terminal
+(defn put-term
   "Fill a section of a terminal with a sub-terminal"
-  [term :- schemas/Terminal
-   sub-term :- schemas/Terminal
-   col-offset :- s/Num
-   row-offset :- s/Num])
+  [term sub-term
+   col-offset row-offset])
 
 (defn swap-blocks [term col1 row1 col2 row2]
   (let [first-block (get-block term col1 row1)

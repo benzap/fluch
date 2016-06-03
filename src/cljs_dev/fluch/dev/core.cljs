@@ -1,7 +1,6 @@
 (ns fluch.dev.core
   (:require
    [devtools.core :as devtools]
-   [schema.core :as s]
    [fluch.core :as fluch]
    [fluch.terminal :as t]
    [fluch.canvas :as c]
@@ -9,7 +8,6 @@
 
 (devtools/install!)
 (enable-console-print!)
-(s/set-fn-validation! true)
 
 (def canvas (c/init (.getElementById js/document "term")))
 (.log js/console "canvas" canvas)
@@ -24,6 +22,10 @@
 (reset! term (t/swap-block-left @term 1 1))
 (reset! term (t/swap-col-left @term 1))
 (reset! term (t/swap-row-up @term 1))
+(reset! term (t/swap-row-up @term 1))
+(let [sterm (t/sub-term @term 1 1 2 2)]
+  (.log js/console "sterm" sterm)
+  )
 
 (t/refresh! @term)
 

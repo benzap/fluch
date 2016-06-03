@@ -38,7 +38,6 @@
                  :foreground-color Color
                  :background-color Color})
 
-
 ;; Checking type of Terminal Block
 (defn is-type? [xs x] (= (:type xs) x))
 (def TerminalBlock
