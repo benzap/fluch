@@ -118,6 +118,19 @@
                            ::size
                            ::content]))
 
+(s/fdef terminal
+        :args (s/cat :context 
+                     ::context
+                     :terminal-options 
+                     (s/keys :req-un [::rows
+                                      ::cols
+                                      ::size
+                                      ::font/font
+                                      ::offset
+                                      ::color/foreground-color
+                                      ::color/background-color]))
+        :ret ::terminal)
+
 (defn locate-block
   "returns the pixel location and dimensions of the block in pixels"
   [{:keys [size options]} col-index row-index]
@@ -131,6 +144,11 @@
      :y (-> height (* (+ row-index row-offset)))
      :width width
      :height height}))
+
+(s/fdef locate-block
+        :args (s/cat :terminal ::terminal
+                     :col-index ::schemas/unsigned-int
+                     :row-index ::schemas/unsigned-int))
 
 (defn get-block
   "get the block at the given column-row point"

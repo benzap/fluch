@@ -9,6 +9,7 @@
 
 (devtools/install!)
 (enable-console-print!)
+(s/instrument-all)
 
 (def canvas (c/init (.getElementById js/document "term")))
 (.log js/console "canvas" canvas)
@@ -32,11 +33,3 @@
 (t/refresh! @term)
 
 (.log js/console "term" @term)
-
-(.log js/console (s/explain ::t/block (t/text-block "a" {})))
-(.log js/console (s/explain ::t/terminal @term))
-
-(s/def ::row (s/coll-of integer? []))
-(s/def ::content (s/coll-of ::row []))
-
-(.log js/console (s/explain ::content [[1 2 3] [4 5 6]]))
