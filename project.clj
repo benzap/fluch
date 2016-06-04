@@ -16,9 +16,9 @@
   :doo {:build "test"}
   :cljsbuild {:builds {:dev
                        {:source-paths ["src/cljs" "src/cljs_dev"]
-                        :compiler {:output-dir "resources/public/js/out"
+                        :compiler {:output-dir "resources/public/js/out_dev"
                                    :output-to "resources/public/js/dev_fluch.js"
-                                   :asset-path "js/out"
+                                   :asset-path "js/out_dev"
                                    :optimizations :none
                                    :main fluch.dev.core
                                    :pretty-print true

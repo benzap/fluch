@@ -1,7 +1,16 @@
 (ns fluch.color
   "Includes functions for creating colors and manipulating colors for
   the terminal canvas"
-  (:require [fluch.schemas :as schemas]))
+  (:require [fluch.schemas :as schemas]
+            [cljs.spec :as s]))
+
+(s/def ::color (s/tuple ::schemas/byterange
+                        ::schemas/byterange
+                        ::schemas/byterange
+                        ::schemas/byterange))
+
+(s/def ::foreground-color ::color)
+(s/def ::background-color ::color)
 
 (def re-hex #"(?i)#([0-9A-F]{1,2})([0-9A-F]{1,2})([0-9A-F]{1,2})")
 (def re-rgba #"(?i)rgba\(([0-9]+),\s*([0-9]+),\s*([0-9]+),\s*([0-9.]+)\)")

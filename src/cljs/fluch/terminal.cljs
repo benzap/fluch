@@ -1,11 +1,11 @@
 (ns fluch.terminal
-  (:require [com.rpl.specter :as specter]
-
+  (:require [cljs.spec :as s]
+            [com.rpl.specter :as specter]
+            
             [fluch.schemas :as schemas]
             [fluch.color :as color]
             [fluch.canvas :as canvas]
-            [fluch.font]
-            ))
+            [fluch.font :as font]))
 
 (def default-num-rows 24)
 (def default-num-cols 80)
@@ -34,6 +34,15 @@
            :italic italic}
    :text text})
 
+(s/def ::type string?)
+(s/def ::text string?)
+(s/def ::text-block 
+  (s/keys :req-un [::type 
+                   ::color/background-color
+                   ::color/foreground-color
+                   ::font/style
+                   ::text]))
+
 (defn empty-block
   [{:keys [foreground-color
            background-color]
@@ -43,6 +52,14 @@
    :foreground-color foreground-color
    :background-color background-color})
 
+(s/def ::empty-block
+  (s/keys :req-un [::type
+                   ::color/foreground-color
+                   ::color/background-color]))
+
+(s/def ::block (s/or ::text-block 
+                     ::empty-block))
+
 (defn terminal-content
   [rows cols foreground-color background-color]
   (let [terminal-block (text-block "0"
@@ -50,6 +67,10 @@
                          :background-color background-color})
         terminal-row (vec (repeat cols terminal-block))]
     (vec (repeat rows terminal-row))))
+
+(s/def ::terminal-font (s/keys :req-un [::family ::ratio]))
+(s/def ::terminal-row (s/coll-of ::block []))
+(s/def ::content (s/coll-of ::terminal-row []))
 
 (defn terminal
   [context
@@ -74,6 +95,28 @@
    :content (terminal-content
              rows cols
              foreground-color background-color)})
+
+
+(s/def ::context #(instance? js/CanvasRenderingContext2D %))
+(s/def ::rows ::schemas/unsigned-int)
+(s/def ::cols ::schemas/unsigned-int)
+(s/def ::size (s/and number? schemas/>=zero?))
+(s/def ::offset (s/cat :x-offset ::schemas/unsigned-int
+                       :y-offset ::schemas/unsigned-int))
+
+(s/def ::options (s/keys :req-un
+                         [::color/foreground-color
+                          ::color/background-color
+                          ::offset
+                          ::font/font]))
+
+(s/def ::terminal (s/keys :req-un
+                          [::context
+                           ::options
+                           ::rows
+                           ::cols
+                           ::size
+                           ::content]))
 
 (defn locate-block
   "returns the pixel location and dimensions of the block in pixels"

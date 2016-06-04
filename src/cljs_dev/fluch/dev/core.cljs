@@ -1,6 +1,7 @@
 (ns fluch.dev.core
   (:require
    [devtools.core :as devtools]
+   [cljs.spec :as s]
    [fluch.core :as fluch]
    [fluch.terminal :as t]
    [fluch.canvas :as c]
@@ -18,6 +19,7 @@
                                     :offset [1 1]
                                     :foreground-color [255 255 255 255]
                                     :background-color [255 128 128 255]})))
+
 (reset! term (t/put-block @term (t/text-block "a" {}) 1 1))
 (reset! term (t/swap-block-left @term 1 1))
 (reset! term (t/swap-col-left @term 1))
@@ -30,3 +32,11 @@
 (t/refresh! @term)
 
 (.log js/console "term" @term)
+
+(.log js/console (s/explain ::t/block (t/text-block "a" {})))
+(.log js/console (s/explain ::t/terminal @term))
+
+(s/def ::row (s/coll-of integer? []))
+(s/def ::content (s/coll-of ::row []))
+
+(.log js/console (s/explain ::content [[1 2 3] [4 5 6]]))
