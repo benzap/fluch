@@ -62,7 +62,7 @@
 
 (defn terminal-content
   [rows cols foreground-color background-color]
-  (let [terminal-block (text-block "0"
+  (let [terminal-block (empty-block
                         {:foreground-color foreground-color
                          :background-color background-color})
         terminal-row (vec (repeat cols terminal-block))]
@@ -157,13 +157,24 @@
   (-> content (get row-index) (get col-index)))
 
 (defn put-block
-  [{:keys [content] :as term}
+  [{:keys [content rows cols] :as term}
    block col-index row-index]
-  (let [new-content
-        (specter/transform [(specter/keypath row-index)
-                            (specter/keypath col-index)]
-                           (fn [_] block) content)]
-    (assoc term :content new-content)))
+  (if (and (< col-index cols) (< row-index rows))
+    (let [new-content
+          (specter/setval [(specter/keypath row-index)
+                           (specter/keypath col-index)]
+                          block content)]
+      (assoc term :content new-content))
+    (do
+      (.log js/console "Failed Index" col-index row-index)
+      term)))
+
+(s/fdef put-block
+        :args (s/cat :terminal ::terminal
+                     :block ::block
+                     :col-index ::schemas/unsigned-int
+                     :row-index ::schemas/unsigned-int)
+        :ret ::terminal)
 
 (defn clear-block
   [{:keys [options] :as term}
@@ -172,6 +183,12 @@
         empty (empty-block {:foreground-color foreground-color
                             :background-color background-color})]
     (put-block term empty col-index row-index)))
+
+(s/fdef clear-block
+        :args (s/cat :terminal ::terminal
+                     :col-index ::schemas/unsigned-int
+                     :row-index ::schemas/unsigned-int)
+        :ret ::terminal)
 
 (defmulti draw-block!
   (fn [term block row-index col-index]
@@ -214,6 +231,13 @@
       :else
       (recur (inc i) j))))
 
+(s/fdef refresh!
+        :args (s/cat :terminal ::terminal)
+        :ret ::terminal)
+
+(defn NAV-SUBMAT [i j rows cols]
+  [[(specter/srange j (+ j rows)) specter/ALL] (specter/srange i (+ i cols))])
+
 (defn sub-term
   "Get a sub terminal, representing a section of the current
   terminal.
@@ -227,19 +251,47 @@
    col-offset row-offset
    cols rows]
   (let [new-content 
-        (->> content
-             (specter/select [specter/ALL (specter/srange col-offset (+ cols col-offset))])
-             (specter/select [(specter/srange row-offset (+ rows row-offset)) specter/ALL]))]
+        (specter/select (NAV-SUBMAT col-offset row-offset cols rows) content)]
     (-> term 
         (assoc :content new-content)
         (assoc :cols cols)
         (assoc :rows rows)
         (assoc-in [:options :offset] [col-offset row-offset]))))
 
+(s/fdef sub-term
+        :args (s/cat :terminal ::terminal
+                     :col-offset ::schemas/unsigned-int
+                     :row-offset ::schemas/unsigned-int
+                     :cols ::schemas/unsigned-int
+                     :rows ::schemas/unsigned-int)
+        :ret ::terminal)
+
 (defn put-term
   "Fill a section of a terminal with a sub-terminal"
   [term sub-term
-   col-offset row-offset])
+   col-offset row-offset]
+  (let [sub-rows (:rows sub-term)
+        sub-cols (:cols sub-term)]
+    (loop [i 0 j 0 new-term term]
+      (let [sub-block (get-block sub-term i j)
+            ioffset (+ i col-offset)
+            joffset (+ j row-offset)
+            updated-term (put-block new-term sub-block ioffset joffset)]
+        (cond
+          (and (>= (inc j) sub-rows) (>= (inc i) sub-cols))
+          updated-term
+          (>= (inc i) sub-cols)
+          (recur 0 (inc j) updated-term)
+          :else
+          (recur (inc i) j updated-term)
+          )))))
+
+(s/fdef put-term
+        :args (s/cat :term ::terminal
+                     :sub-term ::terminal
+                     :col-offset ::schemas/unsigned-int
+                     :row-offset ::schemas/unsigned-int)
+        :ret ::terminal)
 
 (defn swap-blocks [term col1 row1 col2 row2]
   (let [first-block (get-block term col1 row1)
@@ -248,11 +300,25 @@
         (put-block first-block col2 row2)
         (put-block second-block col1 row1))))
 
+(s/fdef swap-blocks
+        :args (s/cat :term ::terminal
+                     :col1 ::schemas/unsigned-int
+                     :row1 ::schemas/unsigned-int
+                     :col2 ::schemas/unsigned-int
+                     :row2 ::schemas/unsigned-int)
+        :ret ::terminal)
+
 (defn swap-block-left
   [term col row]
   (if (<= col 0)
     (clear-block term col row)
     (swap-blocks term col row (dec col) row)))
+
+(s/fdef swap-block-left
+        :args (s/cat :term ::terminal
+                     :col ::schemas/unsigned-int
+                     :row ::schemas/unsigned-int)
+        :ret ::terminal)
 
 (defn swap-block-right
   [{:keys [cols] :as term} col row]
@@ -260,12 +326,23 @@
     (clear-block term col row)
     (swap-blocks term col row (inc col) row)))
 
+(s/fdef swap-block-right
+        :args (s/cat :term ::terminal
+                     :col ::schemas/unsigned-int
+                     :row ::schemas/unsigned-int)
+        :ret ::terminal)
+
 (defn swap-block-up
   [term col row]
   (if (<= row 0)
     (clear-block term col row)
     (swap-blocks term col row col (dec row))))
 
+(s/fdef swap-block-up
+        :args (s/cat :term ::terminal
+                     :col ::schemas/unsigned-int
+                     :row ::schemas/unsigned-int)
+        :ret ::terminal)
 
 (defn swap-block-down
   [{:keys [rows] :as term} col row]
@@ -273,11 +350,22 @@
     (clear-block term col row)
     (swap-blocks term col row col (inc row))))
 
+(s/fdef swap-block-down
+        :args (s/cat :term ::terminal
+                     :col ::schemas/unsigned-int
+                     :row ::schemas/unsigned-int)
+        :ret ::terminal)
+
 (defn swap-col-left
   [{:keys [rows] :as term} col]
   (if (<= col 0)
     (reduce #(clear-block %1 %2 col) term (range rows))
     (reduce #(swap-blocks %1 col %2 (dec col) %2) term (range rows))))
+
+(s/fdef swap-col-left
+        :args (s/cat :term ::terminal
+                     :col ::schemas/unsigned-int)
+        :ret ::terminal)
 
 (defn swap-col-right
   [{:keys [rows cols] :as term} col]
@@ -285,17 +373,32 @@
     (reduce #(clear-block %1 %2 col) term (range rows))
     (reduce #(swap-blocks %1 col %2 (inc col) %2) term (range rows))))
 
+(s/fdef swap-col-right
+        :args (s/cat :term ::terminal
+                     :col ::schemas/unsigned-int)
+        :ret ::terminal)
+
 (defn swap-row-up
   [{:keys [rows cols] :as term} row]
   (if (<= row 0)
     (reduce #(clear-block %1 row %2) term (range cols))
     (reduce #(swap-blocks %1 %2 row %2 (dec row)) term (range cols))))
 
+(s/fdef swap-row-up
+        :args (s/cat :term ::terminal
+                     :row ::schemas/unsigned-int)
+        :ret ::terminal)
+
 (defn swap-row-down
   [{:keys [rows cols] :as term} row]
   (if (>= row rows)
     (reduce #(clear-block %1 row %2) term (range cols))
     (reduce #(swap-blocks %1 %2 row %2 (inc row)) term (range cols))))
+
+(s/fdef swap-row-down
+        :args (s/cat :term ::terminal
+                     :row ::schemas/unsigned-int)
+        :ret ::terminal)
 
 (defn resize
   "Resize a Terminal to fill the new resized extents"
