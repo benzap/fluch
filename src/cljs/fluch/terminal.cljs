@@ -43,6 +43,15 @@
                    ::font/style
                    ::text]))
 
+(s/fdef text-block
+        :args (s/cat :text ::text
+                     :options (s/keys :opt-un [::color/foreground-color
+                                               ::color/background-color
+                                               ::font/bold
+                                               ::font/underline
+                                               ::font/italic]))
+        :ret ::text-block)
+
 (defn empty-block
   [{:keys [foreground-color
            background-color]
@@ -56,6 +65,11 @@
   (s/keys :req-un [::type
                    ::color/foreground-color
                    ::color/background-color]))
+
+(s/fdef empty-block
+        :args (s/cat :options (s/keys :opt-un [::color/foreground-color
+                                               ::color/background-color]))
+        :ret ::empty-block)
 
 (s/def ::block (s/or ::text-block 
                      ::empty-block))
@@ -119,8 +133,7 @@
                            ::content]))
 
 (s/fdef terminal
-        :args (s/cat :context 
-                     ::context
+        :args (s/cat :context ::context
                      :terminal-options 
                      (s/keys :req-un [::rows
                                       ::cols
