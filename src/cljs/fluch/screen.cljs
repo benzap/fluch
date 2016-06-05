@@ -1,4 +1,4 @@
-(ns fluch.terminal
+(ns fluch.screen
   (:require [cljs.spec :as s]
             [com.rpl.specter :as specter]
             
@@ -74,19 +74,19 @@
 (s/def ::block (s/or ::text-block 
                      ::empty-block))
 
-(defn terminal-content
+(defn screen-content
   [rows cols foreground-color background-color]
-  (let [terminal-block (empty-block
+  (let [screen-block (empty-block
                         {:foreground-color foreground-color
                          :background-color background-color})
-        terminal-row (vec (repeat cols terminal-block))]
-    (vec (repeat rows terminal-row))))
+        screen-row (vec (repeat cols screen-block))]
+    (vec (repeat rows screen-row))))
 
-(s/def ::terminal-font (s/keys :req-un [::family ::ratio]))
-(s/def ::terminal-row (s/coll-of ::block []))
-(s/def ::content (s/coll-of ::terminal-row []))
+(s/def ::screen-font (s/keys :req-un [::family ::ratio]))
+(s/def ::screen-row (s/coll-of ::block []))
+(s/def ::content (s/coll-of ::screen-row []))
 
-(defn terminal
+(defn screen
   [context
    {:keys [rows cols size font offset
            foreground-color
@@ -106,7 +106,7 @@
    :rows rows
    :cols cols
    :size size
-   :content (terminal-content
+   :content (screen-content
              rows cols
              foreground-color background-color)})
 
@@ -124,7 +124,7 @@
                           ::offset
                           ::font/font]))
 
-(s/def ::terminal (s/keys :req-un
+(s/def ::screen (s/keys :req-un
                           [::context
                            ::options
                            ::rows
@@ -132,9 +132,9 @@
                            ::size
                            ::content]))
 
-(s/fdef terminal
+(s/fdef screen
         :args (s/cat :context ::context
-                     :terminal-options 
+                     :screen-options 
                      (s/keys :req-un [::rows
                                       ::cols
                                       ::size
@@ -142,7 +142,7 @@
                                       ::offset
                                       ::color/foreground-color
                                       ::color/background-color]))
-        :ret ::terminal)
+        :ret ::screen)
 
 (defn locate-block
   "returns the pixel location and dimensions of the block in pixels"
@@ -159,7 +159,7 @@
      :height height}))
 
 (s/fdef locate-block
-        :args (s/cat :terminal ::terminal
+        :args (s/cat :screen ::screen
                      :col-index ::schemas/unsigned-int
                      :row-index ::schemas/unsigned-int))
 
@@ -170,59 +170,57 @@
   (-> content (get row-index) (get col-index)))
 
 (defn put-block
-  [{:keys [content rows cols] :as term}
+  [{:keys [content rows cols] :as screen}
    block col-index row-index]
   (if (and (< col-index cols) (< row-index rows))
     (let [new-content
           (specter/setval [(specter/keypath row-index)
                            (specter/keypath col-index)]
                           block content)]
-      (assoc term :content new-content))
-    (do
-      (.log js/console "Failed Index" col-index row-index)
-      term)))
+      (assoc screen :content new-content))
+    screen))
 
 (s/fdef put-block
-        :args (s/cat :terminal ::terminal
+        :args (s/cat :screen ::screen
                      :block ::block
                      :col-index ::schemas/unsigned-int
                      :row-index ::schemas/unsigned-int)
-        :ret ::terminal)
+        :ret ::screen)
 
 (defn clear-block
-  [{:keys [options] :as term}
+  [{:keys [options] :as screen}
    col-index row-index]
   (let [{:keys [foreground-color background-color]} options
         empty (empty-block {:foreground-color foreground-color
                             :background-color background-color})]
-    (put-block term empty col-index row-index)))
+    (put-block screen empty col-index row-index)))
 
 (s/fdef clear-block
-        :args (s/cat :terminal ::terminal
+        :args (s/cat :screen ::screen
                      :col-index ::schemas/unsigned-int
                      :row-index ::schemas/unsigned-int)
-        :ret ::terminal)
+        :ret ::screen)
 
 (defmulti draw-block!
-  (fn [term block row-index col-index]
+  (fn [screen block row-index col-index]
     (:type block)))
 
 (defmethod draw-block! "Empty"
-  [term block col-index row-index]
+  [screen block col-index row-index]
   (let [{:keys [context options]}
-        term
+        screen
         {:keys [background-color]}
         options
         {:keys [x y width height]}
-        (locate-block term col-index row-index)]
+        (locate-block screen col-index row-index)]
     (canvas/fill-rect context x y width height :color background-color)))
 
 (defmethod draw-block! "Text"
-  [term block
+  [screen block
    col-index row-index]
-  (let [{:keys [context options size]} term
+  (let [{:keys [context options size]} screen
         {:keys [foreground-color background-color text font]} (merge options block)
-        {:keys [x y width height]} (locate-block term col-index row-index)]
+        {:keys [x y width height]} (locate-block screen col-index row-index)]
     (canvas/fill-rect context x y width height :color background-color)
     (canvas/draw-text context text x y
                       :size size
@@ -230,13 +228,13 @@
                       :foreground-color foreground-color)))
 
 (defn refresh!
-  [{:keys [rows cols] :as term}]
+  [{:keys [rows cols] :as screen}]
   (loop [i 0 j 0]
-    (draw-block! term (get-block term i j) i j)
+    (draw-block! screen (get-block screen i j) i j)
     (cond
       ;; processed all blocks
       (and (>= (inc j) rows) (>= (inc i) cols))
-      term
+      screen
       ;; at the end of the row
       (>= (inc i) cols)
       (recur 0 (inc j))
@@ -245,174 +243,174 @@
       (recur (inc i) j))))
 
 (s/fdef refresh!
-        :args (s/cat :terminal ::terminal)
-        :ret ::terminal)
+        :args (s/cat :screen ::screen)
+        :ret ::screen)
 
 (defn NAV-SUBMAT [i j rows cols]
   [[(specter/srange j (+ j rows)) specter/ALL] (specter/srange i (+ i cols))])
 
-(defn sub-term
-  "Get a sub terminal, representing a section of the current
-  terminal.
+(defn sub-screen
+  "Get a sub screen, representing a section of the current
+  screen.
 
-  A sub-terminal has the same characteristics as a normal
-  Terminal. col-offset and row-offset are the offset from the top-left
-  corner of the terminal. cols and rows are the size extents of the
-  sub terminal, which should be smaller than or equal to the area you
-  are attempting to make a sub-terminal from"
-  [{:keys [content] :as term}
+  A sub-screen has the same characteristics as a normal
+  Screen. col-offset and row-offset are the offset from the top-left
+  corner of the screen. cols and rows are the size extents of the
+  sub screen, which should be smaller than or equal to the area you
+  are attempting to make a sub-screen from"
+  [{:keys [content] :as screen}
    col-offset row-offset
    cols rows]
   (let [new-content 
         (specter/select (NAV-SUBMAT col-offset row-offset cols rows) content)]
-    (-> term 
+    (-> screen 
         (assoc :content new-content)
         (assoc :cols cols)
         (assoc :rows rows)
         (assoc-in [:options :offset] [col-offset row-offset]))))
 
-(s/fdef sub-term
-        :args (s/cat :terminal ::terminal
+(s/fdef sub-screen
+        :args (s/cat :screen ::screen
                      :col-offset ::schemas/unsigned-int
                      :row-offset ::schemas/unsigned-int
                      :cols ::schemas/unsigned-int
                      :rows ::schemas/unsigned-int)
-        :ret ::terminal)
+        :ret ::screen)
 
-(defn put-term
-  "Fill a section of a terminal with a sub-terminal"
-  [term sub-term
+(defn put-screen
+  "Fill a section of a screen with a sub-screen"
+  [screen sub-screen
    col-offset row-offset]
-  (let [sub-rows (:rows sub-term)
-        sub-cols (:cols sub-term)]
-    (loop [i 0 j 0 new-term term]
-      (let [sub-block (get-block sub-term i j)
+  (let [sub-rows (:rows sub-screen)
+        sub-cols (:cols sub-screen)]
+    (loop [i 0 j 0 new-screen screen]
+      (let [sub-block (get-block sub-screen i j)
             ioffset (+ i col-offset)
             joffset (+ j row-offset)
-            updated-term (put-block new-term sub-block ioffset joffset)]
+            updated-screen (put-block new-screen sub-block ioffset joffset)]
         (cond
           (and (>= (inc j) sub-rows) (>= (inc i) sub-cols))
-          updated-term
+          updated-screen
           (>= (inc i) sub-cols)
-          (recur 0 (inc j) updated-term)
+          (recur 0 (inc j) updated-screen)
           :else
-          (recur (inc i) j updated-term)
+          (recur (inc i) j updated-screen)
           )))))
 
-(s/fdef put-term
-        :args (s/cat :term ::terminal
-                     :sub-term ::terminal
+(s/fdef put-screen
+        :args (s/cat :screen ::screen
+                     :sub-screen ::screen
                      :col-offset ::schemas/unsigned-int
                      :row-offset ::schemas/unsigned-int)
-        :ret ::terminal)
+        :ret ::screen)
 
-(defn swap-blocks [term col1 row1 col2 row2]
-  (let [first-block (get-block term col1 row1)
-        second-block (get-block term col2 row2)]
-    (-> term
+(defn swap-blocks [screen col1 row1 col2 row2]
+  (let [first-block (get-block screen col1 row1)
+        second-block (get-block screen col2 row2)]
+    (-> screen
         (put-block first-block col2 row2)
         (put-block second-block col1 row1))))
 
 (s/fdef swap-blocks
-        :args (s/cat :term ::terminal
+        :args (s/cat :screen ::screen
                      :col1 ::schemas/unsigned-int
                      :row1 ::schemas/unsigned-int
                      :col2 ::schemas/unsigned-int
                      :row2 ::schemas/unsigned-int)
-        :ret ::terminal)
+        :ret ::screen)
 
 (defn swap-block-left
-  [term col row]
+  [screen col row]
   (if (<= col 0)
-    (clear-block term col row)
-    (swap-blocks term col row (dec col) row)))
+    (clear-block screen col row)
+    (swap-blocks screen col row (dec col) row)))
 
 (s/fdef swap-block-left
-        :args (s/cat :term ::terminal
+        :args (s/cat :screen ::screen
                      :col ::schemas/unsigned-int
                      :row ::schemas/unsigned-int)
-        :ret ::terminal)
+        :ret ::screen)
 
 (defn swap-block-right
-  [{:keys [cols] :as term} col row]
+  [{:keys [cols] :as screen} col row]
   (if (>= col cols)
-    (clear-block term col row)
-    (swap-blocks term col row (inc col) row)))
+    (clear-block screen col row)
+    (swap-blocks screen col row (inc col) row)))
 
 (s/fdef swap-block-right
-        :args (s/cat :term ::terminal
+        :args (s/cat :screen ::screen
                      :col ::schemas/unsigned-int
                      :row ::schemas/unsigned-int)
-        :ret ::terminal)
+        :ret ::screen)
 
 (defn swap-block-up
-  [term col row]
+  [screen col row]
   (if (<= row 0)
-    (clear-block term col row)
-    (swap-blocks term col row col (dec row))))
+    (clear-block screen col row)
+    (swap-blocks screen col row col (dec row))))
 
 (s/fdef swap-block-up
-        :args (s/cat :term ::terminal
+        :args (s/cat :screen ::screen
                      :col ::schemas/unsigned-int
                      :row ::schemas/unsigned-int)
-        :ret ::terminal)
+        :ret ::screen)
 
 (defn swap-block-down
-  [{:keys [rows] :as term} col row]
+  [{:keys [rows] :as screen} col row]
   (if (>= row rows)
-    (clear-block term col row)
-    (swap-blocks term col row col (inc row))))
+    (clear-block screen col row)
+    (swap-blocks screen col row col (inc row))))
 
 (s/fdef swap-block-down
-        :args (s/cat :term ::terminal
+        :args (s/cat :screen ::screen
                      :col ::schemas/unsigned-int
                      :row ::schemas/unsigned-int)
-        :ret ::terminal)
+        :ret ::screen)
 
 (defn swap-col-left
-  [{:keys [rows] :as term} col]
+  [{:keys [rows] :as screen} col]
   (if (<= col 0)
-    (reduce #(clear-block %1 %2 col) term (range rows))
-    (reduce #(swap-blocks %1 col %2 (dec col) %2) term (range rows))))
+    (reduce #(clear-block %1 %2 col) screen (range rows))
+    (reduce #(swap-blocks %1 col %2 (dec col) %2) screen (range rows))))
 
 (s/fdef swap-col-left
-        :args (s/cat :term ::terminal
+        :args (s/cat :screen ::screen
                      :col ::schemas/unsigned-int)
-        :ret ::terminal)
+        :ret ::screen)
 
 (defn swap-col-right
-  [{:keys [rows cols] :as term} col]
+  [{:keys [rows cols] :as screen} col]
   (if (>= col cols)
-    (reduce #(clear-block %1 %2 col) term (range rows))
-    (reduce #(swap-blocks %1 col %2 (inc col) %2) term (range rows))))
+    (reduce #(clear-block %1 %2 col) screen (range rows))
+    (reduce #(swap-blocks %1 col %2 (inc col) %2) screen (range rows))))
 
 (s/fdef swap-col-right
-        :args (s/cat :term ::terminal
+        :args (s/cat :screen ::screen
                      :col ::schemas/unsigned-int)
-        :ret ::terminal)
+        :ret ::screen)
 
 (defn swap-row-up
-  [{:keys [rows cols] :as term} row]
+  [{:keys [rows cols] :as screen} row]
   (if (<= row 0)
-    (reduce #(clear-block %1 row %2) term (range cols))
-    (reduce #(swap-blocks %1 %2 row %2 (dec row)) term (range cols))))
+    (reduce #(clear-block %1 row %2) screen (range cols))
+    (reduce #(swap-blocks %1 %2 row %2 (dec row)) screen (range cols))))
 
 (s/fdef swap-row-up
-        :args (s/cat :term ::terminal
+        :args (s/cat :screen ::screen
                      :row ::schemas/unsigned-int)
-        :ret ::terminal)
+        :ret ::screen)
 
 (defn swap-row-down
-  [{:keys [rows cols] :as term} row]
+  [{:keys [rows cols] :as screen} row]
   (if (>= row rows)
-    (reduce #(clear-block %1 row %2) term (range cols))
-    (reduce #(swap-blocks %1 %2 row %2 (inc row)) term (range cols))))
+    (reduce #(clear-block %1 row %2) screen (range cols))
+    (reduce #(swap-blocks %1 %2 row %2 (inc row)) screen (range cols))))
 
 (s/fdef swap-row-down
-        :args (s/cat :term ::terminal
+        :args (s/cat :screen ::screen
                      :row ::schemas/unsigned-int)
-        :ret ::terminal)
+        :ret ::screen)
 
 (defn resize
-  "Resize a Terminal to fill the new resized extents"
-  [term & {:keys [rows cols size]}])
+  "Resize a Screen to fill the new resized extents"
+  [screen & {:keys [rows cols size]}])
