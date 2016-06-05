@@ -6,6 +6,7 @@
    [fluch.core :as fluch]
    [fluch.screen :as screen]
    [fluch.canvas :as c]
+   [fluch.terminal :as t]
    [fluch.font]))
 
 (devtools/install!)
@@ -16,11 +17,11 @@
 (.log js/console "canvas" canvas)
 
 (def screen (atom (screen/screen canvas {:rows 4 :cols 4
-                                    :size 60
-                                    :font fluch.font/monospace
-                                    :offset [0 0]
-                                    :foreground-color [255 255 255 255]
-                                    :background-color [255 128 128 255]})))
+                                         :size 64
+                                         :font fluch.font/monospace
+                                         :offset [0 0]
+                                         :foreground-color [255 255 255 255]
+                                         :background-color [255 128 128 255]})))
 
 (reset! screen (screen/put-block @screen (screen/text-block "a" {}) 1 1))
 (reset! screen (screen/swap-block-left @screen 1 1))
@@ -32,9 +33,10 @@
   (reset! screen (screen/put-screen @screen sscreen 2 2))
   (reset! screen (screen/put-screen @screen sscreen 1 2))
   (reset! screen (screen/put-screen @screen sscreen 0 0))
+  (reset! screen (screen/put-char @screen "b" 0 0 {}))
   )
 
-(.log js/console "screen" @screen)
+(.log js/console "screen" screen)
 
 (screen/refresh! @screen)
 

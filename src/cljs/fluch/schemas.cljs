@@ -18,8 +18,5 @@
 (s/def ::letter string?)
 (s/def ::byterange (s/and integer? >=zero? in-byte-range?))
 
-
-
-
-
-
+;; FIXME: check against actual core.async channels
+(s/def ::async-channel #(not= % nil))

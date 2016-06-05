@@ -71,8 +71,8 @@
                                                ::color/background-color]))
         :ret ::empty-block)
 
-(s/def ::block (s/or ::text-block 
-                     ::empty-block))
+(s/def ::block (s/or :text-block ::text-block 
+                     :empty-block ::empty-block))
 
 (defn screen-content
   [rows cols foreground-color background-color]
@@ -168,6 +168,12 @@
   [{:keys [content]}
    col-index row-index]
   (-> content (get row-index) (get col-index)))
+
+(s/fdef get-block
+        :args (s/cat :screen ::screen
+                     :col-index ::schemas/unsigned-int
+                     :row-index ::schemas/unsigned-int)
+        :ret ::block)
 
 (defn put-block
   [{:keys [content rows cols] :as screen}
@@ -414,3 +420,22 @@
 (defn resize
   "Resize a Screen to fill the new resized extents"
   [screen & {:keys [rows cols size]}])
+
+(defn put-char 
+  [{:keys [options] :as screen} char col row
+   font-options]
+  (let [options (merge options font-options)
+        block (text-block char options)]
+    (put-block screen block row col)))
+
+(s/fdef put-char
+        :args (s/cat :screen ::screen
+                     :char ::text
+                     :col ::schemas/unsigned-int
+                     :row ::schemas/unsigned-int
+                     :options (s/keys :opt-un [::color/foreground-color
+                                               ::color/background-color
+                                               ::font/bold
+                                               ::font/underline
+                                               ::font/italic]))
+        :ret ::screen)
