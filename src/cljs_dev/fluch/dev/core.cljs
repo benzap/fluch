@@ -36,7 +36,9 @@
   (reset! screen (screen/put-char @screen "b" 0 0 {}))
   )
 
-(.log js/console "screen" screen)
+(def terminal (t/terminal @screen {}))
+(t/init terminal)
+
+(.log js/console "terminal" terminal)
 
 (screen/refresh! @screen)
-

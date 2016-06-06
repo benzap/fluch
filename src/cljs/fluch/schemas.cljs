@@ -19,4 +19,6 @@
 (s/def ::byterange (s/and integer? >=zero? in-byte-range?))
 
 ;; FIXME: check against actual core.async channels
-(s/def ::async-channel #(not= % nil))
+(s/def ::async-channel #(instance? cljs.core.async.impl.channels.ManyToManyChannel %))
+(s/def ::async-mult #(not= % nil))
+
