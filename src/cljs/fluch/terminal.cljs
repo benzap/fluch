@@ -38,16 +38,70 @@
                    ::options]))
 
 (defprotocol ITerminal
-  (init [this]))
+  (init [this])
+  (current-position [this])
+  (move-to! [this col row])
+  (put-char! [this char])
+  (up-char! [this])
+  (right-char! [this])
+  (down-char! [this])
+  (left-char! [this])
+  (in> [this input options])
+  (refresh! [this])
+  (out< [this options])
+  (out<< [this callback options]))
 
 (defrecord Terminal [screen cursor event-channel in-channel out-channel options]
   ITerminal
   (init [{:keys [event-channel] :as this}]
     (events/init this)
+
+    ;; Track Events
     (go-loop []
       (let [{:keys [type] :as event} (<! event-channel)]
         (.log js/console "Received Event" event))
-      (recur))))
+      (recur)))
+
+  (current-position [{:keys [cursor]}]
+    @cursor)
+  
+  (move-to! [{:keys [cursor]} col row]
+    (reset! cursor [col row]))
+
+  (put-char! [{:keys [screen] :as this} char]
+    (let [[i j] (current-position this)]
+      (reset! screen (screen/put-char @screen char i j {}))))
+
+  (up-char! [this]
+    (let [[i j] (current-position this)]
+      (when (> j 0)
+        (move-to! this i (dec j)))))
+
+  (right-char! [{:keys [screen] :as this}]
+    (let [[i j] (current-position this)
+          {:keys [rows cols]} @screen]
+      (when (< i (dec cols))
+        (move-to! this (inc i) j))))
+
+  (down-char! [{:keys [screen] :as this}]
+    (let [[i j] (current-position this)
+          {:keys [rows cols]} @screen]
+      (when (< j (dec rows))
+        (move-to! this i (inc j)))))
+
+  (left-char! [this]
+    (let [[i j] (current-position this)]
+      (when (> i 0)
+        (move-to! this (dec i) j))))
+
+  (in> [this input options])
+
+  (refresh! [{:keys [screen]}]
+    (screen/refresh! @screen))
+
+  (out< [this options])
+
+  (out<< [this callback options]))
 
 (defn terminal
   [screen
