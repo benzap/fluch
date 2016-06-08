@@ -46,7 +46,7 @@
   [{:keys [screen event-channel] :as terminal}]
   (events/listen (-> @screen :context .-canvas) (.-MOUSEMOVE EventType)
                  (fn [e]
-                   (put! event-channel {:type :mouse-down
+                   (put! event-channel {:type :mouse-move
                                         :gevent e
                                         :offset [(.-offsetX e) (.-offsetY e)]
                                         :ctrl-pressed? (.-ctrlKey e)
@@ -59,9 +59,7 @@
                    true)))
 
 (def keyboard-mapping
-  {8 "backspace"
-   9 "\t"
-   13 "\n"
+  {
    32 " "
    33 "!"
    34 "\""
@@ -157,34 +155,53 @@
    125 "}"
    })
 
-(defn init-capture-backspace
-  "backspace in most browsers causes it to go to the previous
-  webpage. This disables the default behaviour."
+(def keyboard-special-mapping
+  {8 :backspace
+   9 :tab
+   13 :enter
+   37 :left-arrow
+   38 :up-arrow
+   39 :right-arrow
+   40 :down-arrow
+   })
+
+(defn init-special-keys
+  "Represents cursor keys, enter key, etc
+
+  TODO: only send event if current terminal is in focus"
   [{:keys [event-channel] :as terminal}]
   (events/listen js/window (.-KEYDOWN EventType)
-                (fn [e]
-                  (when (= (.-keyCode e) 8)
-                    (put! event-channel {:type :backspace
-                                         :gevent e
-                                         :ctrl-pressed? (.-ctrlKey e)
-                                         :alt-pressed? (.-altKey e)
-                                         :shift-pressed? (.-shiftKey e)
-                                         :char-code (.-keyCode e)
-                                         :key (get keyboard-mapping (.-keyCode e))})
-                    (.preventDefault e)))
-                true))
+                 (fn [e]
+                   (when-let [key (get keyboard-special-mapping (.-keyCode e))]
+                     (put! event-channel {:type :key-press-special
+                                          :gevent e
+                                          :ctrl-pressed? (.-ctrlKey e)
+                                          :alt-pressed? (.-altKey e)
+                                          :shift-pressed? (.-shiftKey e)
+                                          :char-code (.-charCode e)
+                                          :key-code (.-keyCode e)
+                                          :key key})
+                     (.preventDefault e))
+                   #_(.log js/console "key: " (.-keyCode e) (aget e "event_" "code") " --> "
+                         (get keyboard-special-mapping (.-keyCode e)))
+
+                   nil)
+                 true))
 
 (defn init-keypress
+  "TODO: only send event if current terminal is in focus"
   [{:keys [event-channel] :as terminal}]
   (events/listen js/window (.-KEYPRESS EventType)
                  (fn [e]
-                   (put! event-channel {:type :key-press
-                                        :gevent e
-                                        :ctrl-pressed? (.-ctrlKey e)
-                                        :alt-pressed? (.-altKey e)
-                                        :shift-pressed? (.-shiftKey e)
-                                        :char-code (.-keyCode e)
-                                        :key (get keyboard-mapping (.-keyCode e))})
+                   (when-let [key (get keyboard-mapping (.-charCode e))]
+                     (put! event-channel {:type :key-press
+                                          :gevent e
+                                          :ctrl-pressed? (.-ctrlKey e)
+                                          :alt-pressed? (.-altKey e)
+                                          :shift-pressed? (.-shiftKey e)
+                                          :char-code (.-charCode e)
+                                          :key-code (.-keyCode e)
+                                          :key key}))
                    #_(.log js/console "key: " (.-keyCode e) (aget e "event_" "code") " --> "
                            (get keyboard-mapping (.-keyCode e)))
 
@@ -192,9 +209,9 @@
                    nil)
                  true))
 
-(defn init [terminal]
+(defn init-terminal [terminal]
   #_(init-mouse-keydown terminal)
   #_(init-mouse-keyup terminal)
   #_(init-mouse-move terminal)
-  (init-capture-backspace terminal)
+  (init-special-keys terminal)
   (init-keypress terminal))

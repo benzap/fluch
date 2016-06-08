@@ -426,7 +426,7 @@
    font-options]
   (let [options (merge options font-options)
         block (text-block char options)]
-    (put-block screen block row col)))
+    (put-block screen block col row)))
 
 (s/fdef put-char
         :args (s/cat :screen ::screen

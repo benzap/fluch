@@ -8,7 +8,7 @@
 (s/def ::ratio (s/cat :x-ratio number? :y-ratio number?))
 (s/def ::font (s/keys :req-un [::family  ::ratio]))
 
-(def monospace {:family "monospace" :ratio [1.00 1.00]})
+(def monospace {:family "monospace" :ratio [1.20 1.20]})
 (def courier-new {:family "Courier New" :ratio [1.23 1.13]})
 (def monaco {:family "Monaco" :ratio [2.2 1.13]})
 

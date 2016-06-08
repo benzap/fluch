@@ -25,6 +25,7 @@
 (s/def ::screen #(instance? cljs.core.Atom %))
 
 ;; async channels
+(s/def ::event-bus #(not (nil? %)))
 (s/def ::event-channel ::schemas/async-channel)
 (s/def ::in-channel ::schemas/async-channel)
 (s/def ::out-channel ::schemas/async-channel)
@@ -32,10 +33,19 @@
 (s/def ::terminal
   (s/keys :req-un [::screen
                    ::cursor
+                   ::event-bus
                    ::event-channel
                    ::in-channel
                    ::out-channel
                    ::options]))
+
+(defn process-input-text [terminal text]
+  (cond
+    (.startsWith text "\n")
+    (do 
+      
+      )
+    ))
 
 (defprotocol ITerminal
   (init [this])
@@ -47,28 +57,42 @@
   (down-char! [this])
   (left-char! [this])
   (in> [this input options])
+  (in>> [this input options])
   (refresh! [this])
   (out< [this options])
   (out<< [this callback options]))
 
-(defrecord Terminal [screen cursor event-channel in-channel out-channel options]
+(defrecord Terminal [screen cursor event-bus event-channel in-channel out-channel options]
   ITerminal
-  (init [{:keys [event-channel] :as this}]
-    (events/init this)
+  (init [this]
+    (events/init-terminal this)
 
-    ;; Track Events
+    ;; Track Events, tap into the event-bus
+    (let [event-channel (chan)]
+      (tap event-bus event-channel)
+      (go-loop []
+        (let [{:keys [type key] :as event} (<! event-channel)]
+          (case type
+            :key-press
+            (>! in-channel key)
+            nil)
+          )
+        (recur)))
+    
     (go-loop []
-      (let [{:keys [type] :as event} (<! event-channel)]
-        (.log js/console "Received Event" event))
+      (let [text (<! in-channel)]
+        (put-char! this text)
+        (right-char! this)
+        (refresh! this))
       (recur)))
 
-  (current-position [{:keys [cursor]}]
+  (current-position [this]
     @cursor)
   
-  (move-to! [{:keys [cursor]} col row]
+  (move-to! [this col row]
     (reset! cursor [col row]))
 
-  (put-char! [{:keys [screen] :as this} char]
+  (put-char! [this char]
     (let [[i j] (current-position this)]
       (reset! screen (screen/put-char @screen char i j {}))))
 
@@ -77,13 +101,16 @@
       (when (> j 0)
         (move-to! this i (dec j)))))
 
-  (right-char! [{:keys [screen] :as this}]
+  (right-char! [this]
     (let [[i j] (current-position this)
           {:keys [rows cols]} @screen]
-      (when (< i (dec cols))
-        (move-to! this (inc i) j))))
+      (cond 
+        (< i (dec cols))
+        (move-to! this (inc i) j)
+        (< j (dec rows))
+        (move-to! this 0 (inc j)))))
 
-  (down-char! [{:keys [screen] :as this}]
+  (down-char! [this]
     (let [[i j] (current-position this)
           {:keys [rows cols]} @screen]
       (when (< j (dec rows))
@@ -96,7 +123,9 @@
 
   (in> [this input options])
 
-  (refresh! [{:keys [screen]}]
+  (in>> [this input options])
+
+  (refresh! [this]
     (screen/refresh! @screen))
 
   (out< [this options])
@@ -110,11 +139,13 @@
          cbreak? true
          show-cursor? true}}]
   (let [event-channel (chan)
+        event-bus (mult event-channel)
         in-channel (chan)
         out-channel (chan)]
     (map->Terminal
      {:screen (atom screen)
       :cursor (atom [0 0])
+      :event-bus event-bus
       :event-channel event-channel
       :in-channel in-channel
       :out-channel out-channel

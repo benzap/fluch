@@ -11,13 +11,13 @@
 
 (devtools/install!)
 (enable-console-print!)
-(s/instrument-all)
+#_(s/instrument-all)
 
 (def canvas (c/init (.getElementById js/document "term")))
 (.log js/console "canvas" canvas)
 
-(def screen (atom (screen/screen canvas {:rows 4 :cols 4
-                                         :size 64
+(def screen (atom (screen/screen canvas {:rows 22 :cols 89
+                                         :size 12
                                          :font fluch.font/monospace
                                          :offset [0 0]
                                          :foreground-color [255 255 255 255]
