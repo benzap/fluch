@@ -39,23 +39,22 @@
                    ::out-channel
                    ::options]))
 
-(defn process-input-text [terminal text]
-  (cond
-    (.startsWith text "\n")
-    (do 
-      
-      )
-    ))
+(declare process-input-text)
 
 (defprotocol ITerminal
   (init [this])
   (current-position [this])
   (move-to! [this col row])
   (put-char! [this char])
+  (delete-char! [this])
   (up-char! [this])
   (right-char! [this])
   (down-char! [this])
   (left-char! [this])
+  (beginning-of-line! [this])
+  (end-of-line! [this])
+  (new-line! [this])
+  (delete-backward-char! [this])
   (in> [this input options])
   (in>> [this input options])
   (refresh! [this])
@@ -75,14 +74,20 @@
           (case type
             :key-press
             (>! in-channel key)
+            :key-press-special
+            (case key
+              :backspace
+              (>! in-channel "\b")
+              :enter
+              (>! in-channel "\n")
+              nil)
             nil)
           )
         (recur)))
     
     (go-loop []
       (let [text (<! in-channel)]
-        (put-char! this text)
-        (right-char! this)
+        (process-input-text this text)
         (refresh! this))
       (recur)))
 
@@ -95,6 +100,10 @@
   (put-char! [this char]
     (let [[i j] (current-position this)]
       (reset! screen (screen/put-char @screen char i j {}))))
+
+  (delete-char! [this]
+    (let [[i j] (current-position this)]
+      (reset! screen (screen/clear-block @screen i j))))
 
   (up-char! [this]
     (let [[i j] (current-position this)]
@@ -121,6 +130,23 @@
       (when (> i 0)
         (move-to! this (dec i) j))))
 
+  (beginning-of-line! [this]
+    (let [[i j] (current-position this)]
+      (move-to! this 0 j)))
+
+  (end-of-line! [this]
+    (let [[i j] (current-position this)
+          {:keys [rows cols]} @screen]
+      (move-to! this (dec cols) j)))
+
+  (new-line! [this]
+    (down-char! this)
+    (beginning-of-line! this))
+
+  (delete-backward-char! [this]
+    (left-char! this)
+    (delete-char! this))
+
   (in> [this input options])
 
   (in>> [this input options])
@@ -131,6 +157,25 @@
   (out< [this options])
 
   (out<< [this callback options]))
+
+(defn process-input-text [terminal text]
+  (loop [text text]
+    (cond
+      (<= (count text) 0)
+      nil
+      (.startsWith text "\n")
+      (do 
+        (new-line! terminal)
+        (recur (-> text rest rest)))
+      (.startsWith text "\b")
+      (do
+        (delete-backward-char! terminal)
+        (recur (-> text rest rest)))
+      :else
+      (do
+        (put-char! terminal (first text))
+        (right-char! terminal))
+      )))
 
 (defn terminal
   [screen
