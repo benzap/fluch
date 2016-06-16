@@ -19,7 +19,7 @@
 
 (s/def ::cursor #(instance? cljs.core.Atom %))
 
-(s/def ::options (s/keys :req-un [::echo? ::cbreak? ::show-cursor]))
+(s/def ::options (s/keys :req-un [::echo? ::cbreak? ::show-cursor?]))
 
 ;; TODO: specs for atoms?
 (s/def ::screen #(instance? cljs.core.Atom %))
@@ -55,11 +55,7 @@
   (end-of-line! [this])
   (new-line! [this])
   (delete-backward-char! [this])
-  (in> [this input options])
-  (in>> [this input options])
-  (refresh! [this])
-  (out< [this options])
-  (out<< [this callback options]))
+  (refresh! [this]))
 
 (defrecord Terminal [screen cursor event-bus event-channel in-channel out-channel options]
   ITerminal
@@ -67,43 +63,62 @@
     (events/init-terminal this)
 
     ;; Track Events, tap into the event-bus
-    (let [event-channel (chan)]
-      (tap event-bus event-channel)
-      (go-loop []
-        (let [{:keys [type key] :as event} (<! event-channel)]
-          (case type
-            :key-press
-            (>! in-channel key)
-            :key-press-special
-            (case key
-              :backspace
-              (>! in-channel "\b")
-              :enter
-              (>! in-channel "\n")
+    (let [echo-channel (chan)
+          {:keys [echo? show-cursor?]} options]
+
+      ;; We only echo to the in-channel if it's been enabled
+      (when echo?
+        (tap event-bus event-channel)
+        (go-loop []
+          (let [{:keys [type key] :as event} (<! event-channel)]
+            (case type
+              :key-press
+              (>! in-channel key)
+              :key-press-special
+              (case key
+                :backspace
+                (>! in-channel "\b")
+                :enter
+                (>! in-channel "\n")
+                nil)
               nil)
-            nil)
-          )
-        (recur)))
+            )
+          (recur)))
+
+      ;; TODO: blinking cursor
+      (when show-cursor?
+        ))
     
     (go-loop []
       (let [text (<! in-channel)]
-        (process-input-text this text)
-        (refresh! this))
-      (recur)))
+        (process-input-text this text))
+      (recur))
+
+    (go (move-to! this 0 0)))
 
   (current-position [this]
     @cursor)
   
   (move-to! [this col row]
-    (reset! cursor [col row]))
+    (let [{:keys [show-cursor?]} options
+          [ci cj] @cursor]
+      (when show-cursor?
+        (reset! screen (screen/disable-cursor @screen ci cj))
+        (reset! screen (screen/enable-cursor @screen col row))
+        (screen/refresh! @screen ci cj)
+        (screen/refresh! @screen col row))
+
+      (reset! cursor [col row])))
 
   (put-char! [this char]
     (let [[i j] (current-position this)]
-      (reset! screen (screen/put-char @screen char i j {}))))
+      (reset! screen (screen/put-char @screen char i j {}))
+      (screen/refresh! @screen i j)))
 
   (delete-char! [this]
     (let [[i j] (current-position this)]
-      (reset! screen (screen/clear-block @screen i j))))
+      (reset! screen (screen/clear-block @screen i j))
+      (screen/refresh! @screen i j)))
 
   (up-char! [this]
     (let [[i j] (current-position this)]
@@ -147,16 +162,8 @@
     (left-char! this)
     (delete-char! this))
 
-  (in> [this input options])
-
-  (in>> [this input options])
-
   (refresh! [this]
-    (screen/refresh! @screen))
-
-  (out< [this options])
-
-  (out<< [this callback options]))
+    (screen/refresh! @screen)))
 
 (defn process-input-text [terminal text]
   (loop [text text]
@@ -186,7 +193,7 @@
   (let [event-channel (chan)
         event-bus (mult event-channel)
         in-channel (chan)
-        out-channel (chan)]
+        out-channel (chan 1)]
     (map->Terminal
      {:screen (atom screen)
       :cursor (atom [0 0])
@@ -196,7 +203,7 @@
       :out-channel out-channel
       :options {:echo? echo?
                 :cbreak? cbreak?
-                :show-cursor show-cursor?}})))
+                :show-cursor? show-cursor?}})))
 
 (s/fdef terminal
         :args (s/cat :screen ::screen/screen

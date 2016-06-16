@@ -2,14 +2,15 @@
   (:require [cljs.spec :as s]
             [com.rpl.specter :as specter]
             
+            [fluch.utils :refer [boolean?]]
             [fluch.schemas :as schemas]
             [fluch.color :as color]
             [fluch.canvas :as canvas]
             [fluch.font :as font]))
 
-(def default-num-rows 24)
-(def default-num-cols 80)
-(def default-cell-size 12)
+(def default-num-rows 36)
+(def default-num-cols 96)
+(def default-cell-size 20)
 (def default-foreground-color [255 255 255 255])
 (def default-background-color [0 0 0 255])
 
@@ -18,17 +19,20 @@
   [text
    {:keys [foreground-color
            background-color
+           cursor?
            bold
            underline
            italic]
     :or {foreground-color default-foreground-color
          background-color default-background-color
+         cursor? false
          bold false
          underline false
          italic false}}]
   {:type "Text"
    :foreground-color foreground-color
    :background-color background-color
+   :cursor? cursor?
    :style {:bold bold
            :underline underline
            :italic italic}
@@ -36,10 +40,12 @@
 
 (s/def ::type string?)
 (s/def ::text string?)
+(s/def ::cursor? boolean?)
 (s/def ::text-block 
   (s/keys :req-un [::type 
                    ::color/background-color
                    ::color/foreground-color
+                   ::cursor?
                    ::font/style
                    ::text]))
 
@@ -47,6 +53,7 @@
         :args (s/cat :text ::text
                      :options (s/keys :opt-un [::color/foreground-color
                                                ::color/background-color
+                                               ::cursor?
                                                ::font/bold
                                                ::font/underline
                                                ::font/italic]))
@@ -54,21 +61,26 @@
 
 (defn empty-block
   [{:keys [foreground-color
-           background-color]
+           background-color
+           cursor?]
     :or {foreground-color default-foreground-color
-         background-color default-background-color}}]
+         background-color default-background-color
+         cursor? false}}]
   {:type "Empty"
    :foreground-color foreground-color
-   :background-color background-color})
+   :background-color background-color
+   :cursor? cursor?})
 
 (s/def ::empty-block
   (s/keys :req-un [::type
                    ::color/foreground-color
-                   ::color/background-color]))
+                   ::color/background-color
+                   ::cursor?]))
 
 (s/fdef empty-block
         :args (s/cat :options (s/keys :opt-un [::color/foreground-color
-                                               ::color/background-color]))
+                                               ::color/background-color
+                                               ::cursor?]))
         :ret ::empty-block)
 
 (s/def ::block (s/or :text-block ::text-block 
@@ -196,9 +208,11 @@
 (defn clear-block
   [{:keys [options] :as screen}
    col-index row-index]
-  (let [{:keys [foreground-color background-color]} options
+  (let [{:keys [cursor?]} (get-block screen col-index row-index)
+        {:keys [foreground-color background-color]} options
         empty (empty-block {:foreground-color foreground-color
-                            :background-color background-color})]
+                            :background-color background-color
+                            :cursor? cursor?})]
     (put-block screen empty col-index row-index)))
 
 (s/fdef clear-block
@@ -213,20 +227,22 @@
 
 (defmethod draw-block! "Empty"
   [screen block col-index row-index]
-  (let [{:keys [context options]}
-        screen
-        {:keys [background-color]}
-        options
-        {:keys [x y width height]}
-        (locate-block screen col-index row-index)]
+  (let [{:keys [context options]} screen
+        {:keys [foreground-color background-color cursor?]} (merge options block)
+        {:keys [x y width height]} (locate-block screen col-index row-index)
+        ;; Reverse the fore and back if it's a cursor
+        background-color (if cursor? foreground-color background-color)]
     (canvas/fill-rect context x y width height :color background-color)))
 
 (defmethod draw-block! "Text"
   [screen block
    col-index row-index]
   (let [{:keys [context options size]} screen
-        {:keys [foreground-color background-color text font]} (merge options block)
-        {:keys [x y width height]} (locate-block screen col-index row-index)]
+        {:keys [foreground-color background-color text font cursor?]} (merge options block)
+        {:keys [x y width height]} (locate-block screen col-index row-index)
+        ;; Reverse the fore and back if it's a cursor
+        foreground-color (if cursor? background-color foreground-color)
+        background-color (if cursor? foreground-color background-color)]
     (canvas/fill-rect context x y width height :color background-color)
     (canvas/draw-text context text x y
                       :size size
@@ -234,22 +250,32 @@
                       :foreground-color foreground-color)))
 
 (defn refresh!
-  [{:keys [rows cols] :as screen}]
-  (loop [i 0 j 0]
-    (draw-block! screen (get-block screen i j) i j)
-    (cond
-      ;; processed all blocks
-      (and (>= (inc j) rows) (>= (inc i) cols))
-      screen
-      ;; at the end of the row
-      (>= (inc i) cols)
-      (recur 0 (inc j))
-      ;; process the next column in the row
-      :else
-      (recur (inc i) j))))
+  ([screen i j rows cols]
+   (let [rows (+ rows j)
+         cols (+ cols i)]
+     (loop [i i j j]
+       (draw-block! screen (get-block screen i j) i j)
+       (cond
+         ;; processed all blocks
+         (and (>= (inc j) rows) (>= (inc i) cols))
+         screen
+         ;; at the end of the row
+         (>= (inc i) cols)
+         (recur 0 (inc j))
+         ;; process the next column in the row
+         :else
+         (recur (inc i) j)))))
+  ([{:keys [rows cols] :as screen}]
+   (refresh! screen 0 0 rows cols))
+  ([{:keys [rows cols] :as screen} i j]
+   (refresh! screen i j 1 1)))
 
 (s/fdef refresh!
-        :args (s/cat :screen ::screen)
+        :args (s/cat :screen ::screen
+                     :i ::schemas/unsigned-int
+                     :j ::schemas/unsigned-int
+                     :rows ::schemas/unsigned-int
+                     :cols ::schemas/unsigned-int)
         :ret ::screen)
 
 (defn NAV-SUBMAT [i j rows cols]
@@ -309,6 +335,20 @@
                      :col-offset ::schemas/unsigned-int
                      :row-offset ::schemas/unsigned-int)
         :ret ::screen)
+
+(defn enable-cursor
+  "Enables the cursor on a given block at col row"
+  [screen col row]
+  (let [block (get-block screen col row)
+        block (assoc block :cursor? true)]
+    (put-block screen block col row)))
+
+(defn disable-cursor
+  "Disables the cursor on a given block at col row"
+  [screen col row]
+  (let [block (get-block screen col row)
+        block (assoc block :cursor? false)]
+    (put-block screen block col row)))
 
 (defn swap-blocks [screen col1 row1 col2 row2]
   (let [first-block (get-block screen col1 row1)
@@ -417,6 +457,7 @@
                      :row ::schemas/unsigned-int)
         :ret ::screen)
 
+;; TODO
 (defn resize
   "Resize a Screen to fill the new resized extents"
   [screen & {:keys [rows cols size]}])

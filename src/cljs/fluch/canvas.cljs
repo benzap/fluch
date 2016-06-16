@@ -2,8 +2,8 @@
   (:require [fluch.schemas :as schemas]
             [fluch.color :as color]))
 
-(def default-width 800)
-(def default-height 600)
+(def default-width 1152)
+(def default-height 864)
 
 (defn init
   [div & {:keys [width height]
