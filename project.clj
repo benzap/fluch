@@ -34,11 +34,11 @@
               {:dev
                {:source-paths ["src/cljs" "dev/cljs"]
 
-                :figwheel true
+                :figwheel {:devcards true}
                 ;; Alternatively, you can configure a function to run every time figwheel reloads.
                 ;; :figwheel {:on-jsload "fluch.core/on-figwheel-reload"}
 
-                :compiler {:main "fluch.site"
+                :compiler {:main fluch.site
                            :asset-path "js/compiled/out"
                            :output-to "resources/public/js/compiled/fluch.js"
                            :output-dir "resources/public/js/compiled/out"
@@ -62,7 +62,9 @@
              {:dependencies [[figwheel "0.5.8"]
                              [figwheel-sidecar "0.5.8"]
                              [com.cemerick/piggieback "0.2.1"]
-                             [org.clojure/tools.nrepl "0.2.12"]]
+                             [org.clojure/tools.nrepl "0.2.12"]
+                             [devcards "0.2.2"]
+                             [sablono "0.7.7"]]
 
               :plugins [[lein-figwheel "0.5.8"]]}
 

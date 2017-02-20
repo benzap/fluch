@@ -21,5 +21,8 @@
   ([] (empty-block {})))
 
 (defn letter-block
-  ([char opts] (create-block :text (merge opts {:content char}))
-   [char] (letter-block char {})))
+  ([char opts] (create-block :text (merge opts {:content char})))
+  ([char] (letter-block char {})))
+
+(defn newline-block
+  ([opts] (create-block :newline opts)))
