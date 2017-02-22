@@ -19,7 +19,7 @@
 
 (defn dom-element
   [{:keys [block-dimensions foreground-color background-color font] :as screen}
-   {:keys [style] :as block} i j]
+   {:keys [style type content] :as block} i j]
   (let [element (.createElement js/document "span")
         foreground-color (if (= (:foreground-color block) :default)
                            foreground-color (:foreground-color block))
@@ -44,11 +44,16 @@
       (aset "style" "backgroundColor" background-color)
       (aset "style" "fontFamily" family)
       (aset "style" "fontSize" (str size "px"))
+      (aset "style" "lineHeight" (str h "px"))
+      (aset "style" "textAlign" "center")
       (aset "style" "textDecoration" 
             (cond strikethrough "line-through"
                   underline "underline"
                   :else "none"))
-      (aset "style" "fontStyle" (if italic "italic" "normal")))))
+      (aset "style" "fontStyle" (if italic "italic" "normal"))
+      (aset "style" "fontWeight" (if bold "bold" "normal"))
+      (aset "innerHTML" (cond (= type :text) content
+                              :else "")))))
 
 (defn find-block-delta [old-block new-block]
   (let [[_ props _] (diff old-block new-block)]
