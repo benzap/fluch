@@ -7,7 +7,9 @@
 (def default-background-color "rgba(0, 0, 0, 0.0)")
 
 (def default-screen-opts
-  {:font {:family "monospace" :size 12}
+  {:sub-screen? false
+   :sub-index [0 0]
+   :font {:family "monospace" :size 12}
    :foreground-color default-foreground-color
    :background-color default-background-color
    :num-rows 36
@@ -52,4 +54,38 @@
   [{:keys [content] :as screen} i j]
   (put screen i j (block/empty-block)))
 
-(defn sub [screen w h i j])
+(defn sub [screen w h x y]
+  (let [content
+        (vec (for [j (range y (+ y h))
+                   i (range x (+ x w))]
+               (get-block screen i j)))]
+    (-> screen
+        (assoc :content content)
+        (assoc :sub-screen? true)
+        (assoc :sub-index [x y])
+        (assoc :num-rows h)
+        (assoc :num-cols w))))
+        
+(defn resize 
+  [{:keys [num-rows num-cols content] :as screen} w h]
+  (let [old-size (* num-rows num-cols)
+        new-size (* h w)]
+    (cond
+      (= old-size new-size)
+      (-> screen
+          (assoc :num-rows h)
+          (assoc :num-cols w))
+
+      (< old-size new-size)
+      (-> screen
+          (assoc :content (concat content 
+                                  (for [i (range (- new-size old-size))]
+                                    (block/empty-block))))
+          (assoc :num-rows h)
+          (assoc :num-cols w))
+
+      (> old-size new-size)
+      (-> screen
+          (assoc :content (vec (take new-size content)))
+          (assoc :num-rows h)
+          (assoc :num-cols w)))))
