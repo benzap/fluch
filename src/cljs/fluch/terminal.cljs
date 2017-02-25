@@ -11,12 +11,13 @@
 (defn -on-view-update [old-screen new-screen])
 
 (defn create [dom-root opts]
-  (let [screen (atom (screen/create))
+  (let [screen (atom (screen/create opts))
+        view (view/create-dom-view dom-root screen)
         terminal
         (merge opts
                {:dom-root dom-root
                 :screen screen
-                :view (view/create-dom-view dom-root screen)
+                :view view
                 :buffer []
                 :cursor? false
                 :echo? false})]

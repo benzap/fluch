@@ -3,3 +3,11 @@
     padding: 0;
     margin: 0;
 }
+
+#dev-app-1 {
+    position: relative;
+    margin: auto auto;
+    width: 80%;
+    height: 400px;
+    background-color: black;
+}

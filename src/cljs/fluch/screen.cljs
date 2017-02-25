@@ -13,8 +13,8 @@
    :foreground-color default-foreground-color
    :background-color default-background-color
    :num-rows 36
-   :num-cols 96
-   :block-dimensions [20 20]})
+   :num-cols 72
+   :block-dimensions [12 24]})
 
 (defn -populate-screen 
   [{:keys [num-rows num-cols] :as screen}]

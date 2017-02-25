@@ -2,7 +2,8 @@
   (:require [cljs.spec :as s]
             [clojure.data :refer [diff]]
 
-            [fluch.screen :as screen]))
+            [fluch.screen :as screen]
+            [fluch.delta-fns :as delta-fns]))
 
 (defn delta-action-add [i j]
   {:index [i j]
@@ -40,6 +41,8 @@
       (aset "style" "position" "absolute")
       (aset "style" "left" (str x-pos "px"))
       (aset "style" "top" (str y-pos "px"))
+      (aset "style" "width" (str w "px"))
+      (aset "style" "height" (str h "px"))
       (aset "style" "color" foreground-color)
       (aset "style" "backgroundColor" background-color)
       (aset "style" "fontFamily" family)
@@ -156,21 +159,40 @@
   (concat (process-delta-dimensions old-screen new-screen)
           (process-delta-blocks old-screen new-screen)))
 
-(defn screen-watcher-fn [view key ref old-screen new-screen]
+(defn apply-deltas! [aview delta-blocks]
+  (delta-fns/apply-block-deltas! aview delta-blocks))
+
+(defn screen-watcher-fn [aview key ref old-screen new-screen]
   (let [delta-blocks (find-screen-delta old-screen new-screen)]
     (println "screen changed")
-    (.log js/console (clj->js old-screen))
-    (.log js/console (clj->js new-screen))
+    (.log js/console (clj->js delta-blocks))
+    (apply-deltas! aview delta-blocks)
     ))
 
-(defn -add-screen-watcher [view screen]
+(defn -add-screen-watcher! [view screen]
   (let [watch-fn (partial screen-watcher-fn view)]
-    (add-watch screen nil watch-fn)
-    ))
+    (add-watch screen nil watch-fn)))
 
-(defn -init-view [dom-root screen]
-  (let [view (atom {:dom-elements {}})]
-    (-add-screen-watcher view screen)))
+(defn -fix-dom-root! [dom-root]
+  (when-not (aget dom-root "style" "position")
+    (aset dom-root "style" "position" "relative")))
+
+(defn -populate-view! [aview ascreen]
+  (let [{:keys [num-rows num-cols]} @ascreen
+        {:keys [dom-elements dom-root]} @aview]
+    (doseq [j (range num-rows)
+            i (range num-cols)]
+      (let [block (screen/get-block @ascreen i j)
+            element (dom-element @ascreen block i j)]
+        (swap! aview assoc-in [:dom-elements [i j]] element)
+        (.appendChild dom-root element)
+        ))))
+
+(defn -init-view [dom-root ascreen]
+  (let [view (atom {:dom-elements {} :dom-root dom-root})]
+    (-add-screen-watcher! view ascreen)
+    (-fix-dom-root! dom-root)
+    (-populate-view! view ascreen)))
 
 (defn create-dom-view
   [dom-root screen]
