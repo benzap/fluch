@@ -11,3 +11,11 @@
     height: 400px;
     background-color: black;
 }
+
+::selection {
+    color: black;
+    background-color: white;
+    width: 20px;
+    height: 30px;
+    outline: none;
+}

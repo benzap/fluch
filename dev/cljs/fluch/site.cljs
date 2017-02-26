@@ -39,11 +39,12 @@
                             :num-cols num-cols
                             :block-dimensions [block-width block-height]}))
 
-(terminal/put-char! term 0 0 "H")
-(terminal/put-char! term 1 0 "e")
-(terminal/put-char! term 2 0 "l")
+(terminal/put-char! term 0 0 "H" {:background-color "red"
+                                  :style {:bold true :underline true}})
+(terminal/put-char! term 1 0 "e" {:style {:bold true :underline true}})
+(terminal/put-char! term 2 0 "l" {:style {:italic true :underline true}})
 (terminal/put-char! term 3 0 "l")
-(terminal/put-char! term 4 0 "o")
+(terminal/put-char! term 4 0 "o" {:style {:strikethrough true}})
 
 (terminal/put-char! term 1 1 "H")
 (terminal/put-char! term 1 2 "e")

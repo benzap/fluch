@@ -10,6 +10,27 @@
   [element [_ value]]
   (aset element "innerHTML" value))
 
+(defmethod apply-block-property! :background-color
+  [element [_ value]]
+  (aset element "style" "backgroundColor" value))
+
+(defmethod apply-block-property! :foreground-color
+  [element [_ value]]
+  (aset element "style" "color" value))
+
+(defmethod apply-block-property! :style
+  [element [_ value]]
+  (doseq [[k v] value]
+    (condp = k
+      :bold
+      (aset element "style" "fontWeight" (if v "bold" "normal"))
+      :underline
+      (aset element "style" "textDecoration" (if v "underline" "none"))
+      :strikethrough
+      (aset element "style" "textDecoration" (if v "line-through" "none"))
+      :italic
+      (aset element "style" "fontStyle" (if v "italic" "normal")))))
+
 (defmulti apply-delta! (fn [aview delta] (:action delta)))
 
 (defmethod apply-delta! :modify
