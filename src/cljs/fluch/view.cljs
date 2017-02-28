@@ -1,4 +1,5 @@
 (ns fluch.view
+  (:require-macros [fluch.utils :refer [console-time]])
   (:require [cljs.spec :as s]
             [clojure.data :refer [diff]]
 
@@ -164,9 +165,7 @@
 
 (defn screen-watcher-fn [aview key ref old-screen new-screen]
   (let [delta-blocks (find-screen-delta old-screen new-screen)]
-    (println "screen changed")
-    (.log js/console (clj->js delta-blocks))
-    (apply-deltas! aview delta-blocks)
+    (console-time "View Deltas" (apply-deltas! aview delta-blocks))
     ))
 
 (defn -add-screen-watcher! [view screen]

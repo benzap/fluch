@@ -54,6 +54,9 @@
   [{:keys [content] :as screen} i j]
   (put screen i j (block/empty-block)))
 
+(defn clear-all [screen]
+  (-populate-screen screen))
+
 (defn sub [screen w h x y]
   (let [content
         (vec (for [j (range y (+ y h))

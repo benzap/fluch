@@ -56,6 +56,15 @@
 (terminal/put-char! term 4 1 "l")
 (terminal/put-char! term 5 1 "o")
 
-(println (terminal/get-block term 1 1))
+(terminal/putch! term "b")
+(terminal/putch! term "e")
+(terminal/putch! term "n")
 
+(.addEventListener js/document "keydown"
+                   (fn [e] (let [key (.-key e)]
+                             #_(.log js/console e)
+                             (when (= (count key) 1)
+                               (terminal/putch! term key))
+                             (if (= key "Enter")
+                               (terminal/putch! term "\n")))))
 

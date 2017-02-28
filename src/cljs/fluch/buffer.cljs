@@ -7,10 +7,12 @@
   (move-cursor [this x])
   (put-cursor [this c])
   (get-cursor [this])
-  (put [this x c])
   (get-chars [this])
+  (get-scroll [this])
+  (put [this x c])
   (clear [this])
-  (clear-chars [this x]))
+  (clear-chars [this x])
+  (get-lines [this start end]))
 
 (defrecord SimpleBuffer [content cursor scroll]
   IBuffer
@@ -26,16 +28,15 @@
       (-> this
           (assoc :content (str sfirst c slast))
           (update :cursor + (count c)))))
-  (get-cursor [this]
-    (this :cursor))
+  (get-cursor [this] cursor)
+  (get-chars [this] content)
+  (get-scroll [this] scroll)
   (put [this x c]
     (let [i x
           s content
           sfirst (subs s 0 i)
           slast (subs s i)]
       (assoc this :content (str sfirst c slast))))
-  (get-chars [this]
-    (this :content))
   (clear [this] (assoc this :content ""))
   (clear-chars [this x]
     (let [i cursor
@@ -44,7 +45,12 @@
           slast (subs s i)]
       (-> this
           (assoc :content (str sfirst slast))
-          (update cursor - x)))))
+          (update cursor - x))))
+  (get-lines [this start end]
+    (let [lines (string/split-lines content)]
+      (->> lines
+          (drop start)
+          (take end)))))
 
 (defn simple-buffer
   ([content] (->SimpleBuffer content 0 0))

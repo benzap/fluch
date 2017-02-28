@@ -8,7 +8,8 @@
 
 (defmethod apply-block-property! :content
   [element [_ value]]
-  (aset element "innerHTML" value))
+  (let [value (if (= value :none) "" value)]
+    (aset element "innerHTML" value)))
 
 (defmethod apply-block-property! :background-color
   [element [_ value]]
