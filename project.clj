@@ -4,7 +4,7 @@
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure "1.8.0"]
-                 [org.clojure/clojurescript "1.9.473"]
+                 [org.clojure/clojurescript "1.9.494"]
                  [org.clojure/core.async "0.2.395"]
                  [com.rpl/specter "0.13.2"]
                  [org.clojure/core.match "0.3.0-alpha4"]
@@ -32,7 +32,7 @@
 
   :cljsbuild {:builds
               {:dev
-               {:source-paths ["src/cljs" "dev/cljs"]
+               {:source-paths ["src/cljs" "src/clj" "dev/clj" "dev/cljs"]
 
                 :figwheel {:devcards true}
                 ;; Alternatively, you can configure a function to run every time figwheel reloads.
@@ -64,7 +64,8 @@
                              [com.cemerick/piggieback "0.2.1"]
                              [org.clojure/tools.nrepl "0.2.12"]
                              [devcards "0.2.2"]
-                             [sablono "0.7.7"]]
+                             [sablono "0.7.7"]
+                             [org.clojure/test.check "0.9.0"]]
 
               :plugins [[lein-figwheel "0.5.8"]]}
 
