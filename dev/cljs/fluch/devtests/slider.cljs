@@ -50,8 +50,7 @@
 
     (t/is (let [sl (-> (slider/create "test")
                      (slider/end)
-                     (slider/left 2))
-                _ (println sl)]
+                     (slider/left 2))]
           (= (slider/get-char sl) "s"))))
 
   (t/testing "slider/right"
@@ -61,8 +60,7 @@
          (slider/right 2)))
 
     (t/is (let [sl (-> (slider/create "test")
-                     (slider/right 2))
-                _ (println sl)]
+                     (slider/right 2))]
           (= (slider/get-char sl) "s"))))  
 
   (t/testing "slider/set-point"
@@ -121,5 +119,68 @@
      (-> (slider/create "test")
          (slider/set-mark :test)
          (slider/clear-marks))))
-  
+
+  (t/testing "slider/right-until"
+    (is-conformed
+     ::slider/slider
+     (-> (slider/create "test")
+         (slider/right-until #"s")))
+
+    (t/is (let [sl (-> (slider/create "test")
+                     (slider/right-until #"s"))]
+          (= (slider/get-char sl) "s"))))
+ 
+  (t/testing "slider/left-until"
+    (is-conformed
+     ::slider/slider
+     (-> (slider/create "test")
+         (slider/end)
+         (slider/left-until #"s")))
+
+    (t/is (let [sl (-> (slider/create "test")
+                       (slider/end)
+                       (slider/left-until #"s"))]
+            (= (slider/get-char sl) "s"))))
+
+  (t/testing "slider/forward-word"
+    (is-conformed
+     ::slider/slider
+     (-> (slider/create "test good")
+         (slider/forward-word)))
+
+    (t/is (let [sl (-> (slider/create "test good")
+                     (slider/forward-word))]
+          (= (slider/get-char sl) "g"))))
+ 
+  (t/testing "slider/end-of-line"
+    (is-conformed
+     ::slider/slider
+     (-> (slider/create "test\ngood")
+         (slider/end-of-line)))
+    
+    (t/is (let [sl (-> (slider/create "test\ngood")
+                       (slider/end-of-line))]
+            (= (slider/get-char sl) "\n"))))
+
+  (t/testing "slider/beginning-of-line"
+    (is-conformed
+     ::slider/slider
+     (-> (slider/create "test\ngood")
+         (slider/end)
+         (slider/beginning-of-line)))
+    
+    (t/is (let [sl (-> (slider/create "test\ngood")
+                       (slider/end)
+                       (slider/beginning-of-line))]
+            (= (slider/get-char sl) "g"))))
+
+  (t/testing "slider/forward-line"
+    (is-conformed
+     ::slider/slider
+     (-> (slider/create "test\ngood")
+         (slider/forward-line)))
+    
+    (t/is (let [sl (-> (slider/create "test\ngood")
+                       (slider/forward-line))]
+            (= (slider/get-char sl) "g"))))
 )
