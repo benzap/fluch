@@ -1,199 +1,58 @@
 (ns fluch.view
-  (:require-macros [fluch.utils :refer [console-time]])
+  (:require-macros [cljs.core.async.macros :refer [go go-loop]]
+                   [fluch.utils :refer [console-time]])
   (:require [cljs.spec :as s]
+            [cljs.core.async :refer [put! chan <! >! timeout close!]]
+            [clojure.string :as string]
             [clojure.data :refer [diff]]
+            [garden.core :as garden]
 
             [fluch.screen :as screen]
+            [fluch.block :as block]
             [fluch.delta-fns :as delta-fns]))
 
-(defn delta-action-add [i j]
-  {:index [i j]
-   :action :add})
+(defn class-encode [s]
+  (string/replace s #"([_\s.,#])" "-"))
 
-(defn delta-action-remove [i j]
-  {:index [i j]
-   :action :remove})
+(defn class-root [view]
+  (str "fluch-view-" (class-encode (::name view))))
 
-(defn delta-action-modify [i j props]
-  {:index [i j]
-   :action :modify
-   :props props})
+(defn- init [view]
+  (doto (::root-dom view)
+    (.setAttribute "class" (class-root view)))
+  view)
 
-(defn dom-element
-  [{:keys [block-dimensions foreground-color background-color font] :as screen}
-   {:keys [style type content] :as block} i j]
-  (let [element (.createElement js/document "span")
-        foreground-color (if (= (:foreground-color block) :default)
-                           foreground-color (:foreground-color block))
+(defn create [name root-dom]
+  (let [view
+        {::name name
+         ::root-dom root-dom
+         ::input-channel (chan)}]
+    (init view)))
+    
+(defn clear! [view]
+  (doto (::root-dom view)
+    (aset "innerHTML" "")))
 
-        background-color (if (= (:background-color block) :default)
-                           background-color (:background-color block))
+(defn draw! [view block]
+  (let [style 
+        (garden/style {:position "absolute"
+                       :text-align "center"
+                       :line-height (str (::block/height block) "px")
+                       :left (str (::block/left block) "px")
+                       :top (str (::block/top block) "px")
+                       :color (::block/foreground-color block)
+                       :background-color (::block/background-color block)
+                       :font-family (::block/font-family block)
+                       :font-size (str (::block/font-size block) "px")
+                       :width (str (::block/width block) "px")
+                       :height (str (::block/height block) "px")})
+        elem
+        (doto (.createElement js/document "div")
+          (.setAttribute "style" style)
+          (aset "innerHTML" (::block/char block)))]
+    (.appendChild (::root-dom view) elem)))
 
-        {:keys [family size] :or {family "monospace" size 12}} 
-        (if (= (:font block) :default) font (:font block))
-
-        {:keys [underline bold strikethrough italic]} style
-        
-        [w h] block-dimensions
-
-        x-pos (* i w)
-        y-pos (* j h)]
-    (doto element
-      (aset "style" "position" "absolute")
-      (aset "style" "left" (str x-pos "px"))
-      (aset "style" "top" (str y-pos "px"))
-      (aset "style" "width" (str w "px"))
-      (aset "style" "height" (str h "px"))
-      (aset "style" "color" foreground-color)
-      (aset "style" "backgroundColor" background-color)
-      (aset "style" "fontFamily" family)
-      (aset "style" "fontSize" (str size "px"))
-      (aset "style" "lineHeight" (str h "px"))
-      (aset "style" "textAlign" "center")
-      (aset "style" "textDecoration" 
-            (cond strikethrough "line-through"
-                  underline "underline"
-                  :else "none"))
-      (aset "style" "fontStyle" (if italic "italic" "normal"))
-      (aset "style" "fontWeight" (if bold "bold" "normal"))
-      (aset "innerHTML" (cond (= type :text) content
-                              :else "")))))
-
-(defn find-block-delta [old-block new-block]
-  (let [[_ props _] (diff old-block new-block)]
-    props))
-
-(defn process-delta-dimensions
-  [old-screen new-screen]
-  (let [nr-old (:num-rows old-screen)
-        nr-new (:num-rows new-screen)
-        delta-rows (- nr-new nr-old)
-        
-        nc-old (:num-cols old-screen)
-        nc-new (:num-cols new-screen)
-        delta-cols (- nc-new nc-old)]
-    (cond
-      ;; No Change
-      (and (= delta-rows 0) (= delta-cols 0))
-      []
-
-      ;; Only Elongated Rows
-      (and (> delta-rows 0) (= delta-cols 0))
-      (vec (for [i (range 0 nc-old)
-                 j (range nr-old nr-new)]
-             (delta-action-add i j)))
-
-      ;; Only Elongated Cols
-      (and (= delta-rows 0) (> delta-cols 0))
-      (vec (for [i (range nc-old nc-new)
-                 j (range 0 nr-old)]
-             (delta-action-add i j)))
-      
-      ;; Only Collapsed Rows
-      (and (< delta-rows 0) (= delta-cols 0))
-      (vec (for [i (range 0 nc-old)
-                 j (range nr-new nr-old)]
-             (delta-action-remove i j)))
-
-      ;; Only Collapsed Cols
-      (and (= delta-rows 0) (< delta-cols 0))
-      (vec (for [i (range nc-new nc-old)
-                 j (range 0 nr-old)]
-             (delta-action-remove i j)))
-
-      ;; Elongated Rows + Elongated Cols
-      (and (> delta-rows 0) (> delta-cols 0))
-      (concat
-       (vec (for [i (range nc-old nc-new)
-                  j (range 0 nr-old)]
-              (delta-action-add i j)))
-       (vec (for [i (range 0 nc-new)
-                  j (range nr-old nr-new)]
-              (delta-action-add i j))))
-
-      ;; Elongated Rows + Collapsed Cols
-      (and (> delta-rows 0) (< delta-cols 0))
-      (concat
-       (vec (for [i (range 0 nc-new)
-                  j (range nr-old nr-new)]
-              (delta-action-add i j)))
-       (vec (for [i (range nc-new nc-old)
-                  j (range 0 nr-old)]
-              (delta-action-remove i j))))
-
-      ;; Collapsed Rows + Elongated Cols
-      (and (< delta-rows 0) (> delta-cols 0))
-      (concat
-       (vec (for [i (range nc-old nc-new)
-                  j (range 0 nr-new)]
-              (delta-action-add i j)))
-       (vec (for [i (range 0 nc-old)
-                  j (range nr-new nr-old)]
-              (delta-action-remove i j))))
-
-      ;; Collapsed Rows + Collapsed Cols
-      (and (< delta-rows 0) (< delta-cols 0))
-      (concat
-       (vec (for [i (range nc-new nc-old)
-                  j (range 0 nr-new)]
-              (delta-action-remove i j)))
-       (vec (for [i (range 0 nc-old)
-                  j (range nr-new nr-old)]
-              (delta-action-remove i j)))))))
-
-(defn process-delta-blocks [old-screen new-screen]
-  (let [num-rows (min (:num-rows old-screen)
-                      (:num-rows new-screen))
-        num-cols (min (:num-cols old-screen)
-                      (:num-cols new-screen))
-        deltas
-        (for [i (range 0 num-cols)
-              j (range 0 num-rows)]
-          (when-let [props 
-                     (find-block-delta (screen/get-block old-screen i j)
-                                       (screen/get-block new-screen i j))]
-            (delta-action-modify i j props)))]
-    ;; Remove nils
-    (filter (complement nil?) deltas)))
-
-(defn find-screen-delta [old-screen new-screen]
-  (concat (process-delta-dimensions old-screen new-screen)
-          (process-delta-blocks old-screen new-screen)))
-
-(defn apply-deltas! [aview delta-blocks]
-  (delta-fns/apply-block-deltas! aview delta-blocks))
-
-(defn screen-watcher-fn [aview key ref old-screen new-screen]
-  (let [delta-blocks (find-screen-delta old-screen new-screen)]
-    (console-time "View Deltas" (apply-deltas! aview delta-blocks))
-    ))
-
-(defn -add-screen-watcher! [view screen]
-  (let [watch-fn (partial screen-watcher-fn view)]
-    (add-watch screen nil watch-fn)))
-
-(defn -fix-dom-root! [dom-root]
-  (when-not (aget dom-root "style" "position")
-    (aset dom-root "style" "position" "relative")))
-
-(defn -populate-view! [aview ascreen]
-  (let [{:keys [num-rows num-cols]} @ascreen
-        {:keys [dom-elements dom-root]} @aview]
-    (doseq [j (range num-rows)
-            i (range num-cols)]
-      (let [block (screen/get-block @ascreen i j)
-            element (dom-element @ascreen block i j)]
-        (swap! aview assoc-in [:dom-elements [i j]] element)
-        (.appendChild dom-root element)
-        ))))
-
-(defn -init-view [dom-root ascreen]
-  (let [view (atom {:dom-elements {} :dom-root dom-root})]
-    (-add-screen-watcher! view ascreen)
-    (-fix-dom-root! dom-root)
-    (-populate-view! view ascreen)))
-
-(defn create-dom-view
-  [dom-root screen]
-  (let [view (-init-view dom-root screen)]
-    view))
+(defn draw-screen! [view screen]
+  (doseq [[j _v] (map-indexed vector screen)]
+    (doseq [[i block] (map-indexed vector _v)]
+      (when block (draw! view block)))))

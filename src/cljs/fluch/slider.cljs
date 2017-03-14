@@ -404,5 +404,5 @@
             :else (recur (right sl0 1))))))
 
 (s/fdef find-next
-        :args (s/cat :slider ::sldier :search string?)
+        :args (s/cat :slider ::slider :search string?)
         :ret ::slider)
