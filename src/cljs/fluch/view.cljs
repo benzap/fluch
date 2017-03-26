@@ -29,3 +29,12 @@
   (doto (::root-dom view)
     (aset "innerHTML" "")))
 
+(defn draw! [view text]
+  (let [el (.createElement js/document "span")
+        style (garden/style {:position "relative"
+                             :color "white"
+                             :font-family "monospace"})]
+    (doto el
+      (.setAttribute "style" style))
+    (aset el "innerHTML" text)
+    (.appendChild (view ::root-dom) el)))

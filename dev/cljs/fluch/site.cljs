@@ -18,5 +18,7 @@
 ;; Demo Page
 (when-let [dev-app-1 (.querySelector js/document "#dev-app-1")]
   (let [v (view/create "app" dev-app-1)]
+    (view/clear! v)
+    (view/draw! v "Hello World!")
     ))
 
