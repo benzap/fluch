@@ -1,8 +1,6 @@
 (ns fluch.tests
   (:require-macros [devcards.core :refer [defcard]])
-  (:require [devcards.core :as dc]
-            
-            [fluch.screen :as screen]))
+  (:require [devcards.core :as dc]))
 
 (defcard testing
   {:test 123})
