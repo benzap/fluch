@@ -1,6 +1,7 @@
 (ns fluch.core
+  (:require-macros [cljs.core.async.macros :refer [go]])
   (:require [cljs.spec :as s]
-
+            [cljs.core.async :refer [put! chan <! close!]]
             [fluch.terminal :as terminal]))
 
 (.log js/console "Hello Fluch!")
