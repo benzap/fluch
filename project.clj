@@ -1,4 +1,4 @@
-(defproject fluch "0.2.0-SNAPSHOT"
+(defproject fluch "0.1.0-SNAPSHOT"
   :description "CLJS Frontend CLI"
   :url "http://github.com/benzap/fluch"
   :license {:name "Eclipse Public License"
@@ -6,24 +6,14 @@
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [org.clojure/clojurescript "1.9.494"]
                  [org.clojure/core.async "0.2.395"]
-                 [com.rpl/specter "1.0.0"]
-                 [org.clojure/core.match "0.3.0-alpha4"]
-                 [garden "1.3.2"]
-
-                 ;; dev server
-                 [ring "1.5.0"]
-                 [ring/ring-defaults "0.2.1"]
-                 [bk/ring-gzip "0.1.1"]
-                 [ring.middleware.logger "0.5.0"]
-                 [compojure "1.5.1"]
-                 [environ "1.1.0"]]
+                 [com.rpl/specter "1.0.0"]]
 
   :plugins [[lein-cljsbuild "1.1.5"]
             [lein-environ "1.1.0"]]
 
   :min-lein-version "2.6.1"
 
-  :source-paths ["src/clj" "src/cljs" "dev/clj" "dev/cljs"]
+  :source-paths ["src"]
 
   :test-paths ["test"]
 
@@ -31,57 +21,36 @@
 
   :uberjar-name "fluch.jar"
 
-  :repl-options {:init-ns user}
+  :repl-options {:init-ns dev.fluch.user}
 
   :cljsbuild {:builds
               {:dev
-               {:source-paths ["src/cljs" "src/clj" "dev/clj" "dev/cljs"]
+               {:source-paths ["src" "dev"]
 
-                :figwheel {:devcards true}
-                ;; Alternatively, you can configure a function to run every time figwheel reloads.
-                ;; :figwheel {:on-jsload "fluch.core/on-figwheel-reload"}
+                :figwheel true
 
-                :compiler {:main fluch.site
+                :compiler {:main fluch.core
                            :asset-path "js/compiled/out"
                            :output-to "resources/public/js/compiled/fluch.js"
                            :output-dir "resources/public/js/compiled/out"
+                           :optimizations :none
                            :source-map-timestamp true}}
 
-               :prod-demo
-               {:source-paths ["src/cljs"]
+               :prod
+               {:source-paths ["src"]
                 :compiler {:main fluch.core
-                           :asset-path "js/compiled/out"
-                           :output-to "dist/js/compiled/fluch.js"
-                           :output-dir "dist/js/compiled/out"
-                           :optimizations :simple
+                           :asset-path "js/compiled/out_prod"
+                           :output-to "dist/js/compiled/fluch.min.js"
+                           :output-dir "dist/js/compiled/out_prod"
+                           :optimizations :advanced
                            }}}}
 
-  :figwheel {:server-ip "localhost"              ;; default
-             :css-dirs ["resources/public/css"]  ;; watch and update CSS
-             :ring-handler user/http-handler
+  :figwheel {:css-dirs ["resources/public/css"]  ;; watch and update CSS
              :server-logfile "log/figwheel.log"}
 
   :profiles {:dev
              {:dependencies [[figwheel "0.5.8"]
                              [figwheel-sidecar "0.5.8"]
-                             [com.cemerick/piggieback "0.2.1"]
-                             [org.clojure/tools.nrepl "0.2.12"]
-                             [devcards "0.2.2"]
-                             [sablono "0.7.7"]
-                             [org.omcljs/om "0.9.0"]
-                             [org.clojure/test.check "0.9.0"]]
+                             [org.clojure/tools.nrepl "0.2.12"]]
 
-              :plugins [[lein-figwheel "0.5.8"]]}
-
-             :uberjar
-             {:source-paths ^:replace ["src/clj"]
-              :hooks [leiningen.cljsbuild]
-              :omit-source true
-              :aot :all
-              :cljsbuild {:builds
-                          {:app
-                           {:source-paths ^:replace ["src/cljs"]
-                            :compiler
-                            {:optimizations :simple
-                             :pretty-print false}}}}}}
-  )
+              :plugins [[lein-figwheel "0.5.8"]]}})
